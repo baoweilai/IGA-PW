@@ -1,0 +1,37 @@
+# Generated numerical data
+examples/**/data/
+paper_outputs/data/
+
+# MATLAB binary results and caches
+*.mat
+*.fig
+**/cache/
+**/cache_*/
+**/cache-*/
+**/cache_pw/
+**/cache_pw*/
+**/cache_nurbs/
+
+# Runtime output
+*.log
+*.out
+*.tmp
+*.temp
+*.bak
+*.asv
+
+# Compiled binaries
+*.mex*
+*.dll
+*.exe
+*.o
+*.obj
+*.a
+*.lib
+
+# OS and editor metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
