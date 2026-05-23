@@ -44,12 +44,6 @@ run_example_4('helium_fields')
 run_example_4('vout_fourier')
 ```
 
-If a required file or folder is missing, MATLAB stops with an error.
-
-Run scripts are stored inside their corresponding workflow folders under `examples/example_i/model/`. The `data/` folders are for generated or saved numerical data. Workflow code is classified with short English folder names such as `core`, `operators`, `solver`, `assembly`, `iga`, `nurbs`, `dg`, and `error_norms`.
-
-After a workflow finishes, the runner copies new or updated manuscript outputs into `paper_outputs` using the layout `paper_outputs/<figures|tables|data>/example_i/workflow_name/`. Raw solver files such as `run.mat` and cache files remain under `examples/example_i/data/`.
-
 ## Paper Output Map
 
 | Paper output | Script |
