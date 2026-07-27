@@ -1,5 +1,5 @@
 function cmap = error_colormap(n)
-%Return the error colormap.
+% Return the error colormap.
 arguments
     n = 256
 end

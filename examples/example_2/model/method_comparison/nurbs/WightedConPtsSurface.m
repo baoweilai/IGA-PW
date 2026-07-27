@@ -1,5 +1,5 @@
 function Pw=WightedConPtsSurface(P,w)
-%Convert surface control points to homogeneous form.
+% Convert surface control points to homogeneous form.
 
 [m,n,ndim]=size(P);
 Pw=zeros(m,n,ndim+1);

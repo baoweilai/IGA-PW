@@ -1,7 +1,8 @@
 function [P,S] =  IGA_DG_Left_Right_Edge_Assemble(nurbs_original_1,nurbs_original_2,nurbs_refine_1,nurbs_refine_2,n_dofs)
-%Assemble matrices or interface terms for the method.
+% Assemble jump and average terms on a vertical patch interface.
 
 
+% Read the geometry and refined-basis data for both patches.
 ConPts_o_1   =  nurbs_original_1.ConPts;
 weights_o_1  =  nurbs_original_1.weights;
 knotU_o_1    =  nurbs_original_1.knotU;
@@ -35,6 +36,7 @@ S = sparse(n_dofs,n_dofs);
 P = S;
 
 
+% Merge both edge partitions and identify neighboring elements.
 right_edge_dofs_1 = nurbs_refine_1.right_edge_dofs;
 left_edge_dofs_2  = nurbs_refine_2.left_edge_dofs;
 
@@ -64,8 +66,7 @@ edge_element_2 =  Merge_edge_elements_idx(VBreaks_2,VBreaks_merge);
 n_gp = length(gp);
 
 
-% As the interface is u = 1, so we consider u =1
-
+% Integrate the interface at u=1 on the first patch.
 for e=1:vNoEs
 
     edge_idx_plus  = edge_element_1(e);
@@ -93,8 +94,9 @@ for e=1:vNoEs
     normal = [tau(2);-tau(1)]/ds;
 
 
-    Jacobi = J1*gw(i)*ds; % The interface is u = 1, now along the v-direction
+    Jacobi = J1*gw(i)*ds; % Scale quadrature along the v direction.
 
+    % Evaluate traces and physical gradients on both sides.
     Uders_plus  = bspbasisDers(knotU_1,pu_1,1,1);
     Nu_plus = Uders_plus(1,end-1:end)';     DNu_plus = Uders_plus(2,end-1:end)';
     Vders_plus  = bspbasisDers(knotV_1,pv_1,v,1);
@@ -106,12 +108,12 @@ for e=1:vNoEs
     basis_grad_plus = [DNu_v_plus,DNv_u_plus]/DF_plus;
 
 
-    Uders_minus  = bspbasisDers(knotU_2,pu_2,0,1); % For Omega 2, it is the left boundary, u = 0.
+    Uders_minus  = bspbasisDers(knotU_2,pu_2,0,1); % The second patch trace uses u=0.
     Nu_minus     = Uders_minus(1,1:2)';     DNu_minus = Uders_minus(2,1:2)';
     Vders_minus  = bspbasisDers(knotV_2,pv_2,v,1);
     Nv_minus     = Vders_minus(1,:);              DNv_minus = Vders_minus(2,:);
 
-    [F_minus,DF_minus] =  NurbsSurface(ConPts_o_2 ,weights_o_2,knotU_o_2 ,pu_o_2,0,knotV_o_2,pv_o_2 ,v);% Right patch
+    [~,DF_minus] =  NurbsSurface(ConPts_o_2 ,weights_o_2,knotU_o_2 ,pu_o_2,0,knotV_o_2,pv_o_2 ,v);% Right patch
     basis_minus = Nu_minus*Nv_minus;    basis_minus = basis_minus(:);
     DNu_v_minus = DNu_minus*Nv_minus;   DNu_v_minus = DNu_v_minus(:);
     DNv_u_minus = Nu_minus*DNv_minus;   DNv_u_minus = DNv_u_minus(:);
@@ -123,14 +125,15 @@ for e=1:vNoEs
     edge_jump_Ae = edge_jump_Ae + edge_jump*edge_jump'*Jacobi;
 
 
-    edge_average    = [basis_grad_plus; basis_grad_minus]*normal/2; % Now it is a column vector
-    edge_average    = edge_average'; % Now it is a row vector
+    edge_average    = [basis_grad_plus; basis_grad_minus]*normal/2;
+    edge_average    = edge_average'; % Form the averaged normal derivative as a row vector.
     edge_average_Ae = edge_average_Ae + edge_jump*edge_average*Jacobi;
 
 
     end
 
 
+    % Add the local interface blocks to the global matrices.
     P(edge_dofs,edge_dofs) =  P(edge_dofs,edge_dofs) + edge_jump_Ae;
 
     S(edge_dofs,edge_dofs) =  S(edge_dofs,edge_dofs) + edge_average_Ae;

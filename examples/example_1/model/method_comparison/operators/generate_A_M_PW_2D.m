@@ -1,5 +1,5 @@
 function [H, M, A, timing] = generate_A_M_PW_2D(L, Nc, inner_domains, p_Vr, n_pw_Vr, opts)
-%Assemble 2-D plane-wave matrices with FFT-Chebyshev inner correction.
+% Assemble 2-D plane-wave matrices with FFT-Chebyshev inner correction.
 
 assert(isfield(opts, 'inner_cheb_n'), 'Missing opts.inner_cheb_n.');
 assert(isfield(opts, 'pw_fft_grid_n'), 'Missing opts.pw_fft_grid_n.');
@@ -18,7 +18,6 @@ N = floor(Nc);
 qN = 2 * N;
 qvals = -qN:qN;
 alpha = 2 * pi / L;
-Omega = L ^ 2;
 
 t_build_U = tic;
 Mker = build_outer_mass_kernel_2D(L, inner_domains, qvals);
@@ -48,7 +47,7 @@ timing.vinner_norm = norm(VinInner(:));
 end
 
 function [H, M, A] = fill_pw_matrices_from_kernels(k_pw, alpha, Mker, Vker, qN)
-%Fill dense PW matrices from Fourier kernels.
+% Fill dense PW matrices from Fourier kernels.
 n_pw = size(k_pw, 1);
 px = k_pw(:, 1).';
 py = k_pw(:, 2).';
@@ -77,7 +76,7 @@ H = 0.5 * (H + H');
 end
 
 function Mker = build_outer_mass_kernel_2D(L, inner_domains, qvals)
-%Compute outer-domain Fourier coefficients for the mass matrix.
+% Compute outer-domain Fourier coefficients for the mass matrix.
 alpha = 2 * pi / L;
 Omega = L ^ 2;
 qN = (numel(qvals) - 1) / 2;
@@ -99,7 +98,7 @@ end
 
 function [Vker, VinInner, info] = build_Vker_fft_chebyshev_2D( ...
     L, N, inner_domains, p_Vr, n_pw_Vr, fft_grid_n, inner_cheb_n)
-%Compute outer potential coefficients from FFT data and Chebyshev correction.
+% Compute outer potential coefficients from FFT data and Chebyshev correction.
 mFFT = fft_grid_n;
 assert(mFFT >= 4 * N + 1, 'pw_fft_grid_n is too small for this cutoff.');
 
@@ -147,7 +146,7 @@ end
 
 function [VinCheb, info] = build_inner_chebyshev_correction_2D( ...
     L, inner_domains, qvals, inner_cheb_n, sample_fun)
-%Integrate inner-patch potential coefficients with tensor Chebyshev data.
+% Integrate inner-patch potential coefficients with tensor Chebyshev data.
 n = inner_cheb_n;
 alpha = 2 * pi / L;
 Omega = L ^ 2;
@@ -199,7 +198,7 @@ info.inner_quad_n = nq;
 end
 
 function params = make_hatV_params(L, inner_domains, p_Vr, n_pw_Vr)
-%Build smooth-potential parameters for the one-center example.
+% Build smooth-potential parameters for the one-center example.
 a = min(0.5 * (inner_domains(1, 2) - inner_domains(1, 1)), ...
     0.5 * (inner_domains(1, 4) - inner_domains(1, 3)));
 a_c = 0.95 * a;
@@ -217,7 +216,7 @@ params.g0 = g0;
 end
 
 function Vh = hatV_Example1(x, y, params)
-%Evaluate the smoothed one-center potential.
+% Evaluate the smoothed one-center potential.
 r = hypot(x, y);
 
 if r <= params.b
@@ -234,7 +233,7 @@ Vh = (1 - eta) * Vorig + eta * params.g0;
 end
 
 function eta = cutoff_eta(r, b, a_c)
-%Evaluate the smooth cutoff function.
+% Evaluate the smooth cutoff function.
 if r <= b
     eta = 1;
 elseif r >= a_c
@@ -246,19 +245,19 @@ end
 end
 
 function th = smooth_step_theta(t)
-%Evaluate the smooth step function.
+% Evaluate the smooth step function.
 th = sfun(t) ./ (sfun(t) + sfun(1 - t));
 end
 
 function y = sfun(t)
-%Evaluate the transition function.
+% Evaluate the transition function.
 y = zeros(size(t));
 idx = (t > 0);
 y(idx) = exp(-1 ./ t(idx));
 end
 
 function [k_list, n_basis] = build_pw_disk_local(Nc)
-%Build the plane-wave disk basis.
+% Build the plane-wave disk basis.
 N = floor(Nc);
 k_list = zeros((2 * N + 1) ^ 2, 2);
 n_basis = 0;
@@ -273,7 +272,7 @@ k_list = k_list(1:n_basis, :);
 end
 
 function F = interval_ft_general(q, aL, aR, alpha)
-%Integrate one-dimensional Fourier modes on an interval.
+% Integrate one-dimensional Fourier modes on an interval.
 F = zeros(size(q));
 idx0 = (q == 0);
 F(idx0) = aR - aL;
@@ -283,6 +282,6 @@ F(~idx0) = (exp(1i * alpha * qq * aR) - exp(1i * alpha * qq * aL)) ./ (1i * alph
 end
 
 function Ksym = hermitize_kernel_2d(K)
-%Enforce conjugate symmetry on a centered Fourier kernel.
+% Enforce conjugate symmetry on a centered Fourier kernel.
 Ksym = 0.5 * (K + conj(K(end:-1:1, end:-1:1)));
 end

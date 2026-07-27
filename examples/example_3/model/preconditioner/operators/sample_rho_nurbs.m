@@ -1,5 +1,5 @@
 function rho_samples = sample_rho_nurbs(cI, ~, nurbs_refine, n_gp)
-%Sample the NURBS density.
+% Sample the NURBS density.
 
 Element    = nurbs_refine.Element;
 knotU      = nurbs_refine.Ubar;
@@ -12,7 +12,9 @@ pv         = nurbs_refine.pv;
 Fhat = @(x,a,b) ((b-a)*x + a + b) / 2;
 [gp, ~] = grule(n_gp);
 
-rho_samples = zeros(NoEs * n_gp * n_gp, 1);
+n_ele_dofs = (pu + 1) * (pv + 1);
+nq_elem = n_gp * n_gp;
+rho_samples = zeros(NoEs * nq_elem, 1);
 
 counter = 1;
 for e = 1:NoEs
@@ -22,23 +24,32 @@ for e = 1:NoEs
     row = Element(e,:);
     ce = cI(row);
 
+    Nu_vals = zeros(pu + 1, n_gp);
     for i = 1:n_gp
-        upar  = Fhat(gp(i), ue(1), ue(2));
-        uders = bspbasisDers(knotU, pu, upar, 1);
-        Nu    = uders(1,:).';
+        upar = Fhat(gp(i), ue(1), ue(2));
+        Nu_vals(:, i) = bsplinebasis(knotU, pu, upar);
+    end
 
+    Nv_vals = zeros(pv + 1, n_gp);
+    for j = 1:n_gp
+        vpar = Fhat(gp(j), ve(1), ve(2));
+        Nv_vals(:, j) = bsplinebasis(knotV, pv, vpar);
+    end
+
+    B = zeros(nq_elem, n_ele_dofs);
+    qid = 1;
+    for i = 1:n_gp
+        Nu = Nu_vals(:, i);
         for j = 1:n_gp
-            vpar  = Fhat(gp(j), ve(1), ve(2));
-            vders = bspbasisDers(knotV, pv, vpar, 1);
-            Nv    = vders(1,:);
-
+            Nv = Nv_vals(:, j).';
             basis_funcs = Nu * Nv;
-            basis_funcs = basis_funcs(:);
-
-            uval = basis_funcs.' * ce;
-            rho_samples(counter) = real(abs(uval)^2);
-            counter = counter + 1;
+            B(qid, :) = basis_funcs(:).';
+            qid = qid + 1;
         end
     end
+
+    uvals = B * ce;
+    rho_samples(counter:counter+nq_elem-1) = real(abs(uvals).^2);
+    counter = counter + nq_elem;
 end
 end

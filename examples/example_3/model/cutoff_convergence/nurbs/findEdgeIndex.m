@@ -1,5 +1,5 @@
 function dg_ele_idx = findEdgeIndex(uBreaks,n_edges, knot)
-%Locate an index or object used by the computation.
+% Find the edge element containing a knot value.
 
 low = 1;
 high = n_edges+1;

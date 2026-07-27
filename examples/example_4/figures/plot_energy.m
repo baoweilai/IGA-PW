@@ -1,7 +1,8 @@
 ﻿function out = plot_energy(userCfg)
-%Plot energy-convergence data.
+% Plot energy-convergence data.
 assert(exist('userCfg', 'var') == 1, 'plot_energy requires userCfg.');
 
+% Resolve workflow paths and paper styling.
 clc;
 rootDir = fileparts(fileparts(mfilename('fullpath')));
 add_workflow_paths(fullfile(rootDir, 'model', 'energy'), ...
@@ -19,17 +20,17 @@ cfg.axes.yMinorTick = 'off'; cfg.axes.labelSize = 12;
 cfg.legend.fontSize = 11;
 cfg.lineColors = [223 122 094; 060 064 091; 130 178 154; 242 204 142] / 255;
 cfg.padX = 0.2;
-cfg.padY = 0.12;
-cfg.labelYOffset = 0.1;
+cfg.padY = 0.16;
+cfg.labelYOffset = 0.06;
 
 cfgRun = default_config(userCfg);
 H = example_helpers(cfgRun);
 
+% Read the configured convergence cases and reference energy.
 referenceEnergy = load_reference_energy_local(H.cfg.resultRoot);
 pList = [1 2];
 KList = [2 4 8 12 16];
 refineList = [1 2 3 4 5];
-yTickList = [22.357 22.358 22.359 22.360 22.361 22.362];
 if isfield(H.cfg, 'energy')
     if isfield(H.cfg.energy, 'p_list')
         pList = reshape(H.cfg.energy.p_list, 1, []);
@@ -50,6 +51,7 @@ nCase = numel(KList);
 energyTotal = zeros(nP, nCase);
 hListByP = zeros(nP, nCase);
 
+% Load the saved energy and mesh size for each case.
 for ip = 1:nP
     for i = 1:nCase
         runFile = H.refinement_case_run_file('energy', pList(ip), KList(i), refineList(i));
@@ -70,7 +72,17 @@ for ip = 1:nP
     end
 end
 hList = hListByP(1, :);
+% Set the vertical range from all computed and reference values.
+yWindow = [energyTotal(:); referenceEnergy];
+yDataMin = min(yWindow);
+yDataMax = max(yWindow);
+yDataSpan = yDataMax - yDataMin;
+if yDataSpan <= eps(max(abs(yWindow)))
+    yDataSpan = max(1, max(abs(yWindow))) * 1e-5;
+end
+yTickList = [22.357 22.358 22.359 22.360 22.361];
 
+% Create and format the convergence axes.
 fig = figure('Color', cfg.fig.bgColor, 'Renderer', cfg.fig.renderer, ...
     'Units', 'inches', 'Position', [1 1 cfg.fig.width cfg.fig.height], ...
     'PaperPositionMode', 'auto');
@@ -89,6 +101,7 @@ set(ax, 'FontSize', cfg.axes.fontSize, ...
 grid(ax, 'off'); ax.XMinorGrid = 'off'; ax.YMinorGrid = 'off';
 ax.XRuler.MinorTick = 'off'; ax.YRuler.MinorTick = 'off';
 
+% Plot the energy curves, reference line, and case labels.
 for ip = 1:nP
     semilogx(ax, hList, energyTotal(ip, :), '-o', ...
         'LineWidth', 1.8, ...
@@ -101,7 +114,7 @@ yline(ax, referenceEnergy, '--', ...
     'LineWidth', 1.5, ...
     'Color', cfg.lineColors(3, :), ...
     'DisplayName', 'Reference');
-yTickRange = max(yTickList) - min(yTickList);
+yTickRange = yDataSpan;
 for i = 1:nCase
     labelText = sprintf('$(%d,%d)$', KList(i), refineList(i));
     yText = min(energyTotal(:, i)) - cfg.labelYOffset * yTickRange;
@@ -129,26 +142,27 @@ lgd = legend(ax, 'show', 'Location', 'northwest', 'Interpreter', 'latex', ...
     'FontSize', cfg.legend.fontSize);
 lgd.Box = 'off';
 
-pngFile = fullfile(H.cfg.plotRoot, 'energy.png');
+% Export the PDF and return the plotted data.
 pdfFile = fullfile(H.cfg.plotRoot, 'energy.pdf');
-exportgraphics(fig, pngFile, 'Resolution', 600);
 exportgraphics(fig, pdfFile, 'ContentType', 'vector');
 
-out = struct('fig', fig, 'png', pngFile, 'pdf', pdfFile, ...
+out = struct('fig', fig, 'pdf', pdfFile, ...
     'pList', pList, 'KList', KList, 'refineList', refineList, ...
     'hList', hList, 'energyTotal', energyTotal, ...
     'referenceEnergy', referenceEnergy);
 end
 
 function referenceEnergy = load_reference_energy_local(resultRoot)
-%Load the reference energy value.
-refFile = fullfile(resultRoot, 'REFERENCE', 'K_45', 'p_2', ...
+% Load the reference energy value.
+refFile = fullfile(resultRoot, 'REFERENCE', 'K_30', 'p_2', ...
     'nelem_32', 'run.mat');
 referenceEnergy = double(h5read(refFile, '/run/meta/energy_total'));
 end
 
 function draw_energy_inset_local(axMain, hList, energyTotal, referenceEnergy, ...
 KList, refineList, cfg)
+% Draw the energy-convergence inset.
+% Select the final two cases and determine the zoom limits.
 target = find(KList == 16 & refineList == 5, 1, 'first');
 assert(~isempty(target), 'Missing the energy inset target case.');
 idx = max(1, target - 1):target;
@@ -169,6 +183,7 @@ if boxYLim(1) >= boxYLim(2)
 end
 xLim = [min(xData) / xPad, max(xData) * xPad];
 
+% Position the inset relative to the highlighted data region.
 fig = ancestor(axMain, 'figure');
 drawnow;
 [xLeft, yTop] = energy_data_to_fig_norm_local(axMain, xLim(1), boxYLim(2));
@@ -188,6 +203,7 @@ insetPos = [insetLeft, insetBottom, insetWidth, insetHeight];
 axInset = axes('Parent', fig, 'Position', insetPos, 'Color', 'w');
 box(axInset, 'on'); hold(axInset, 'on');
 
+% Draw the energy curves and reference line inside the inset.
 for ip = 1:size(energyTotal, 1)
     semilogx(axInset, hList, energyTotal(ip, :), '-o', ...
         'LineWidth', 1.2, ...
@@ -199,6 +215,7 @@ yline(axInset, referenceEnergy, '--', ...
     'LineWidth', 1.0, ...
     'Color', cfg.lineColors(3, :));
 
+% Format the inset and connect it to the main axes.
 set(axInset, ...
     'XScale', 'log', ...
     'XLim', xLim, ...
@@ -221,7 +238,7 @@ uistack(axInset, 'top');
 end
 
 function draw_energy_zoom_box_and_connectors_local(axMain, axInset, xLim, yLim)
-%Draw the energy inset connectors.
+% Draw the energy inset connectors.
 oldUnits = axInset.Units;
 axInset.Units = 'normalized';
 insetPos = axInset.Position;
@@ -254,7 +271,7 @@ line(axMain, [xLim(2), xInsetRight], [yLim(2), yInsetBottom], ...
 end
 
 function [xf, yf] = energy_data_to_fig_norm_local(ax, x, y)
-%Map energy data coordinates to figure coordinates.
+% Map energy data coordinates to figure coordinates.
 [xn, yn] = energy_data_to_axes_norm_local(ax, x, y);
 oldUnits = ax.Units;
 ax.Units = 'normalized';
@@ -265,7 +282,7 @@ yf = pos(2) + yn * pos(4);
 end
 
 function [xn, yn] = energy_data_to_axes_norm_local(ax, x, y)
-%Map energy data coordinates to axes coordinates.
+% Map energy data coordinates to axes coordinates.
 xLim = ax.XLim;
 yLim = ax.YLim;
 if strcmp(ax.XScale, 'log')
@@ -279,7 +296,7 @@ yn = min(max(yn, 0), 1);
 end
 
 function [x, y] = energy_fig_norm_to_data_local(ax, xf, yf)
-%Map figure coordinates back to energy data.
+% Map figure coordinates back to energy data.
 oldUnits = ax.Units;
 ax.Units = 'normalized';
 pos = ax.Position;

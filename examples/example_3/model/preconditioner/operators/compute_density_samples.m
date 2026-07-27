@@ -3,6 +3,7 @@ u, n_dofs_nurbs, pw_dofs_indices, ...
     nurbs_original, nurbs_refine, n_gp, ...
     k_pw, L, a, m_pw)
 
+% Evaluate the inner and outer density samples.
 uI = u(1:n_dofs_nurbs);
 uA = u(pw_dofs_indices);
 

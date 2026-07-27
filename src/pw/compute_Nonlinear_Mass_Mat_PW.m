@@ -1,8 +1,8 @@
 function H = compute_Nonlinear_Mass_Mat_PW(L, Nc, inner_domains,rho, u0_h)
-%Assemble the plane-wave nonlinear mass matrix.
+% Assemble the plane-wave nonlinear mass matrix.
 
 
-%============================= initiate the data =========================%
+% Build the circular plane-wave index set.
 DIM = 2;
 n = 0; % number of basis satisfying |k|<=Nc
 N = floor(Nc);
@@ -13,8 +13,8 @@ for ii = -N:N
     m = sqrt(N^2 - ii^2);
     m = floor(m);
     for j=-m:m
-            n=n+1;
-            p(n,:)=[ii,j];
+        n=n+1;
+        p(n,:)=[ii,j];
 
     end
 end
@@ -22,7 +22,7 @@ end
 p = p(1:n,:);
 
 
-% evaluate the discrete potential
+% Sample the nonlinear potential on a Cartesian grid.
 
 
 dx = 1e-1;
@@ -35,20 +35,20 @@ vext = zeros(m,m);
 for ii = 1:m
     for j = 1:m
 
-            x = -L/2 +  dx/2  + (ii-1)*L/m ;
-            y = -L/2 +  dy/2  + (j-1)*L/m  ;
-            vext(ii,j) = V_hydrogen(x,y,inner_domains,rho,u0_h,L,p, n);
+        x = -L/2 +  dx/2  + (ii-1)*L/m ;
+        y = -L/2 +  dy/2  + (j-1)*L/m  ;
+        vext(ii,j) = V_hydrogen(x,y,inner_domains,rho,u0_h,L,p, n);
 
-        end
+    end
 end
 
 
-% inverse FFT for vext
+% Transform the sampled potential to Fourier coefficients.
 
 vext_fft = ifftn(vext);
 
 
-%======================== calculate the matrix element ===================%
+% Assemble the Fourier convolution matrix.
 
 H = zeros(n,n);
 
@@ -58,7 +58,7 @@ for ii=1:n
         q_p = dk;
 
 
-        % external potential H_{pq}=vext_fft(p-q)
+        % Map the wave-vector difference to an FFT index.
 
         for k = 1:DIM
             if dk(k) < 0
@@ -73,11 +73,7 @@ for ii=1:n
 
         end
 
-%          H(ii,j) = H(ii,j) + vext_fft(dk(1),dk(2)) *cos( q_p(1)*pi )*cos( q_p(2)*pi );    %% By using V(r) = 1/r;
-
-  H(ii,j) = H(ii,j) + vext_fft( dk(1),dk(2) )*exp(1i* pi* q_p(1)* (1/m + 1) )* exp(1i* pi* q_p(2)* (1/m + 1) );
-
-%            H(ii,j) = H(ii,j) + M(ii,j);  % For V(1) = 1
+        H(ii,j) = H(ii,j) + vext_fft( dk(1),dk(2) )*exp(1i* pi* q_p(1)* (1/m + 1) )* exp(1i* pi* q_p(2)* (1/m + 1) );
     end
 end
 
@@ -85,11 +81,9 @@ end
 
 
 function Vr = V_hydrogen(x,y,inner_domains,rho,u0h,L,pw_index, n_pw_basis )
-%Evaluate the hydrogen potential.
+% Evaluate the hydrogen potential.
 
-%                  a2 b2 c2 d2;   % The second inner sub-domain
-%                  a3 b3 c3 d3;   % The third inner sub-domain
-%                  an bn cn dn]   % The n-th inner sub-domain
+% Interpret each inner-domain row as [x_a, x_b, y_c, y_d].
 
 n_inner_domains = size(inner_domains,1);
 
@@ -111,19 +105,19 @@ end
 
 
 if Omega_in_flag == true
-        Vr = 0;
+    Vr = 0;
 else
 
     uh_xy = 0;
 
     for k = 1:n_pw_basis
 
-     uh_xy  = uh_xy + u0h(k)* exp( 1i * 2*pi*pw_index(k,:)*[x;y]/L )/sqrt(L*L);
+        uh_xy  = uh_xy + u0h(k)* exp( 1i * 2*pi*pw_index(k,:)*[x;y]/L )/sqrt(L*L);
 
     end
 
     Vr = rho( uh_xy );
 
-    end
+end
 
 end

@@ -1,5 +1,5 @@
 function edge_element_idx =  Merge_edge_elements_idx(uBreaks,uBreaks_merge)
-%Merge element indices along shared edges.
+% Merge element indices along shared edges.
 
 n_merge_edges = length(uBreaks_merge) - 1;
 n_edges = length(uBreaks) - 1;

@@ -1,11 +1,12 @@
 function run_h_data(caseSpecs)
-%Generate Example 1 h-convergence data.
+% Generate Example 1 h-convergence data.
 
 clc; close all;
 
+% Set workflow paths, solver parameters, and output directories.
 activate_example_workflow('h_convergence', ...
     {'nurbs', 'dg', 'iga', 'assembly', ...
-    'operators', 'error_norms', 'core', 'solver'});
+    'operators', 'error_norms', 'core'});
 exampleDir = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 dataDir = fullfile(exampleDir, 'data');
 oldDir = pwd;
@@ -13,17 +14,11 @@ cleanupObj = onCleanup(@() cd(oldDir));
 cd(dataDir);
 
 Example = 'Example_1';
-
-if nargin < 1 || isempty(caseSpecs)
-    caseSpecs = [ ...
-        struct('Nc', 25, 't', 0, 'refines', 1:6), ...
-        struct('Nc', 25, 't', 1, 'refines', 1:6)];
-end
 n_eigenvalues = 4;
 
 beta = 20;
 n_gp = 10;
-inner_cheb_n = 100;
+inner_cheb_n = 200;
 pw_fft_grid_n = 500;
 
 primme_tol         = 1e-12;
@@ -32,6 +27,7 @@ primme_method      = 'DEFAULT_MIN_TIME';
 primme_reportLevel = 0;
 eps_diag           = 1e-12;
 iface_reg          = 1e-12;
+pattern_tol        = 1e-12;
 
 save_eigenvectors = true;
 save_nurbs        = true;
@@ -44,6 +40,7 @@ if ~exist(resultRoot, 'dir'), mkdir(resultRoot); end
 defaultCacheRoot = fullfile(resultRoot, 'cache_pw');
 if ~exist(defaultCacheRoot, 'dir'), mkdir(defaultCacheRoot); end
 
+% Solve or load each configured refinement case.
 for icase = 1:numel(caseSpecs)
     Nc = caseSpecs(icase).Nc;
     t = caseSpecs(icase).t;
@@ -101,6 +98,7 @@ for icase = 1:numel(caseSpecs)
         opts.primme_reportLevel = primme_reportLevel;
         opts.eps_diag           = eps_diag;
         opts.iface_reg          = iface_reg;
+        opts.pattern_tol        = pattern_tol;
         opts.save_eigenvectors  = save_eigenvectors;
         opts.save_nurbs         = save_nurbs;
         opts.save_pw_index      = save_pw_index;
@@ -120,6 +118,7 @@ for icase = 1:numel(caseSpecs)
         n_dofs(ii)     = ndof;
     end
 
+    % Save the refinement summary for this case.
     T = table(refList, n_dofs, 'VariableNames', {'refine','dof'});
     for k = 1:n_eigenvalues
         T.(sprintf('lambda%d', k)) = Lambda_h(:, k);
@@ -132,7 +131,7 @@ end
 end
 
 function refList = scan_existing_refines(caseDir)
-%Find completed refinement folders.
+% Find completed refinement folders.
 
 refList = [];
 dd = dir(fullfile(caseDir, 'refine_*'));

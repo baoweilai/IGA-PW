@@ -1,5 +1,5 @@
 function addedPaths = add_example_paths(exampleDir)
-%Add one example folder to the MATLAB path.
+% Add one example folder to the MATLAB path.
 
 requiredDirs = {
     exampleDir

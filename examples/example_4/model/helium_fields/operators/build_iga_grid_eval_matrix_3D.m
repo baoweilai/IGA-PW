@@ -1,5 +1,5 @@
 function E = build_iga_grid_eval_matrix_3D(nurbs_refine, X, Y, Z, a)
-%Build IGA grid eval matrix 3D.
+% Build the sparse IGA evaluation matrix on a Cartesian grid.
 
 U = nurbs_refine.Ubar;
 V = nurbs_refine.Vbar;

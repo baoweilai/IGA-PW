@@ -1,5 +1,5 @@
 function ndu=AllBasisFuns(U,p,u)
-%Evaluate all nonzero B-spline basis functions.
+% Evaluate all nonzero B-spline basis functions.
 i=findspan(U,p,u);
 
 ndu=zeros(p+1,p+1);
@@ -14,5 +14,3 @@ saved=(u-U(i-j+r))*temp;
 end
 ndu(j+1,j+1)=saved;
 end
-
-%	left(j)=u-U(i-j+1);right(j)=U(i+j)-u;

@@ -1,6 +1,7 @@
 ﻿function figs = plot_helium_fields()
-%Plot density and potential fields.
+% Plot density and potential fields.
 
+% Resolve workflow paths and paper styling.
 rootDir = fileparts(fileparts(mfilename('fullpath')));
 add_workflow_paths(fullfile(rootDir, 'model', 'helium_fields'), ...
     {'config', 'core', 'operators', 'solver'});
@@ -17,7 +18,8 @@ cfg.axes.tickDir = 'out'; cfg.axes.xMinorTick = 'off';
 cfg.axes.yMinorTick = 'off'; cfg.axes.labelSize = 12;
 cfg.legend.fontSize = 11;
 
-refRunFile = fullfile(resultRoot, 'REFERENCE', 'K_45', 'p_2', ...
+% Load the reference and IGA-PW field data.
+refRunFile = fullfile(resultRoot, 'REFERENCE', 'K_30', 'p_2', ...
     'nelem_32', 'run.mat');
 cmpRunFile = fullfile(resultRoot, 'IGA', 'K_20', 'p_2', ...
     'nelem_08', 'run.mat');
@@ -25,13 +27,13 @@ if ~exist(refRunFile, 'file')
     error('Reference run file not found: %s. Run run_reference first.', refRunFile);
 end
 if ~exist(cmpRunFile, 'file')
-    error('Comparison run file not found: %s. Run run_iga(2,8,20,true) first.', cmpRunFile);
+    error('Comparison run file not found: %s. Run run_iga(2,8,20) first.', cmpRunFile);
 end
 zoomRadius = 0.05;
-zoomInsetYPadRatio = 0.015;  % Smaller value gives a tighter inset y-axis.
-zoomInsetYWindowRatio = {[], [], []};  % Set <1 to shrink the actual inset y-window.
-zoomInsetYLim = {[0.300, 0.324], [0.19, 0.21], []};  % Manual raw y-limits.
-zoomInsetYTicks = {[0.300, 0.312, 0.324], [0.19, 0.20, 0.21], []};
+zoomInsetYPadRatio = 0.05;  % Pad the joint Reference/IGA-PW range in each inset.
+zoomInsetYWindowRatio = {[], [], []};  % Relative inset y-window widths.
+zoomInsetYLim = {[], [], []};  % Explicit inset y-limits.
+zoomInsetYTicks = {[], [], []};
 zoomInsetZeroGapFraction = {[], [], 1/3};
 zoomInsetPosition = [ ...
     0.20, 0.58, 0.36, 0.31; ...
@@ -53,6 +55,7 @@ xmid = xCmp(:);
 domainRadius = Lcmp / 2;
 orbitalDenseInnerN = 401;
 
+% Define field styles and output containers.
 fieldNames = {'orbital', 'density', 'hartree'};
 fieldTags = {'orbital', 'density', 'hartree'};
 refLabel = 'Reference';
@@ -68,11 +71,10 @@ sliceTickLabels = {{'0.10', '0.18', '0.26', '0.34'}, ...
 figs = struct();
 figs.profile = gobjects(numel(fieldNames), 1);
 figs.slice = gobjects(numel(fieldNames), 1);
-figs.profilePng = cell(numel(fieldNames), 1);
 figs.profilePdf = cell(numel(fieldNames), 1);
-figs.slicePng = cell(numel(fieldNames), 1);
 figs.slicePdf = cell(numel(fieldNames), 1);
 
+% Draw and export each radial profile and central slice.
 for iField = 1:numel(fieldNames)
     refGrid = get_field_grid_local(refRun.run, fieldNames{iField});
     cmpGrid = get_field_grid_local(cmpRun.run, fieldNames{iField});
@@ -123,9 +125,9 @@ for iField = 1:numel(fieldNames)
     lgd.FontName = profileStyle.fontName;
     lgd.FontSize = cfg.legend.fontSize;
     lgd.Interpreter = 'latex';
-    [figs.profilePng{iField}, figs.profilePdf{iField}] = export_named_figure_local( ...
+    figs.profilePdf{iField} = export_named_figure_local( ...
         figs.profile(iField), plotRoot, ['helium_profile_' fieldTags{iField}], ...
-        cfg, 'vector');
+        'vector');
 
     figs.slice(iField) = figure('Color', cfg.fig.bgColor, 'Units', 'inches', ...
         'Position', profileStyle.sliceFigPos, 'Renderer', cfg.fig.renderer);
@@ -153,15 +155,15 @@ for iField = 1:numel(fieldNames)
     axis(ax3, 'off');
     grid(ax3, 'off');
     hide_toolbar_local(ax3);
-    [figs.slicePng{iField}, figs.slicePdf{iField}] = export_named_figure_local( ...
+    figs.slicePdf{iField} = export_named_figure_local( ...
         figs.slice(iField), plotRoot, ['helium_slice_' fieldTags{iField}], ...
-        cfg, 'image');
+        'image');
 end
 
 end
 
 function out = load_run_local(runFile)
-%Load one saved run file.
+% Load one saved run file.
 if ~exist(runFile, 'file')
     error('Run file not found: %s', runFile);
 end
@@ -172,7 +174,7 @@ end
 end
 
 function [xmid, L, mFFT] = build_grid_local(run)
-%Build the plotting grid.
+% Build the plotting grid.
 if ~isfield(run, 'meta') || ~isfield(run.meta, 'L') || ~isfield(run.meta, 'grid_mFFT')
     error('run.meta.L or run.meta.grid_mFFT is missing.');
 end
@@ -184,7 +186,7 @@ xmid = 0.5 * (edges(1:end-1) + edges(2:end));
 end
 
 function validate_shared_grid_local(xRef, xCmp, Lref, Lcmp, mRef, mCmp)
-%Validate that field data share one grid.
+% Validate that field data share one grid.
 if mRef ~= mCmp || abs(Lref - Lcmp) > 1e-12 || numel(xRef) ~= numel(xCmp) || ...
         any(abs(xRef(:) - xCmp(:)) > 1e-12)
     error('Reference and comparison runs do not share the same Cartesian grid.');
@@ -192,7 +194,7 @@ end
 end
 
 function fieldGrid = get_field_grid_local(run, fieldName)
-%Return one field grid from saved data.
+% Return one field grid from saved data.
 switch lower(strtrim(fieldName))
     case 'orbital'
         if ~isfield(run, 'meta') || ~isfield(run.meta, 'uGrid') || isempty(run.meta.uGrid)
@@ -221,7 +223,7 @@ end
 end
 
 function VH = solve_poisson_fft_zero_mode_local(rho, L)
-%Solve the zero-mode Poisson equation by FFT.
+% Solve the zero-mode Poisson equation by FFT.
 m = size(rho, 1);
 q = ifftshift(-floor(m / 2):ceil(m / 2) - 1);
 [Qx, Qy, Qz] = ndgrid(q, q, q);
@@ -237,7 +239,7 @@ VH = ifftn(VHat, 'symmetric');
 end
 
 function lineData = extract_axis_line_local(fieldGrid, xmid, axisName)
-%Extract a line through the selected axis.
+% Extract a line through the selected axis.
 [i0, i1, w0, w1] = interpolation_weights_for_point_local(xmid, 0);
 
 switch lower(axisName)
@@ -267,13 +269,13 @@ lineData = lineData(:);
 end
 
 function sliceData = extract_z0_slice_local(fieldGrid, xmid)
-%Extract the z = 0 slice.
+% Extract the z = 0 slice.
 [i0, i1, w0, w1] = interpolation_weights_for_point_local(xmid, 0);
 sliceData = w0 * fieldGrid(:, :, i0) + w1 * fieldGrid(:, :, i1);
 end
 
 function [r, refRadial, cmpRadial] = build_radial_profile_local(xmid, refLine, cmpLine)
-%Build a radial profile from grid data.
+% Build a radial profile from grid data.
 posMask = xmid > 0;
 negMask = xmid < 0;
 [i0, i1, w0, w1] = interpolation_weights_for_point_local(xmid, 0);
@@ -294,7 +296,7 @@ end
 
 function [r, refRadial, cmpRadial] = replace_inner_profile_local( ...
     refRun, cmpRun, fieldName, rGrid, refGridRadial, cmpGridRadial, nDense)
-%Use dense IGA/FFT evaluation inside the IGA radius for smooth profiles.
+% Dense IGA/FFT evaluation produces smooth profiles inside the IGA radius.
 innerRadius = min(get_inner_radius_local(refRun), get_inner_radius_local(cmpRun));
 if ~isfinite(innerRadius) || innerRadius <= 0 || nDense < 2
     r = rGrid;
@@ -314,7 +316,7 @@ cmpRadial = [cmpDense; cmpGridRadial(outerMask)];
 end
 
 function values = eval_dense_profile_radial_local(run, fieldName, r)
-%Evaluate one radial profile from saved coefficients rather than coarse grid samples.
+% Evaluate one radial profile from saved coefficients rather than coarse grid samples.
 switch lower(strtrim(fieldName))
     case 'orbital'
         values = eval_inner_orbital_radial_local(run, r);
@@ -328,7 +330,7 @@ end
 end
 
 function a = get_inner_radius_local(run)
-%Return the IGA subdomain radius.
+% Return the IGA subdomain radius.
 if ~isfield(run, 'meta') || ~isfield(run.meta, 'a')
     error('run.meta.a is missing; cannot evaluate the inner orbital profile.');
 end
@@ -336,7 +338,7 @@ a = double(run.meta.a);
 end
 
 function orbital = eval_inner_orbital_radial_local(run, r)
-%Evaluate the saved IGA orbital on the x-axis.
+% Evaluate the saved IGA orbital on the x-axis.
 if ~isfield(run, 'uh') || isempty(run.uh)
     error('run.uh is missing; cannot evaluate the inner orbital profile.');
 end
@@ -358,7 +360,7 @@ orbital = 0.5 * (abs(uPos(:)) + abs(uNeg(:)));
 end
 
 function density = eval_inner_density_radial_local(run, r)
-%Evaluate the saved IGA density on the x-axis.
+% Evaluate the saved IGA density on the x-axis.
 if ~isfield(run, 'uh') || isempty(run.uh)
     error('run.uh is missing; cannot evaluate the inner density profile.');
 end
@@ -380,7 +382,7 @@ density = 0.5 * (2 * abs(uPos(:)) .^ 2 + 2 * abs(uNeg(:)) .^ 2);
 end
 
 function hartree = eval_hartree_radial_fft_local(run, r)
-%Evaluate Hartree potential on the x-axis by Fourier interpolation.
+% Evaluate Hartree potential on the x-axis by Fourier interpolation.
 if ~isfield(run, 'rhoGrid') || isempty(run.rhoGrid)
     error('run.rhoGrid is missing; cannot evaluate the Hartree profile.');
 end
@@ -395,7 +397,7 @@ hartree = 0.5 * (hartreePos(:) + hartreeNeg(:));
 end
 
 function values = eval_hartree_fft_axis_points_local(rho, L, xq)
-%Evaluate the zero-mode-corrected Hartree potential along the x-axis.
+% Evaluate the zero-mode-corrected Hartree potential along the x-axis.
 m = size(rho, 1);
 q = ifftshift(-floor(m / 2):ceil(m / 2) - 1);
 [Qx, Qy, Qz] = ndgrid(q, q, q);
@@ -420,7 +422,7 @@ values = real(phaseX * planeCoeff(:) / m ^ 3);
 end
 
 function val = eval_iga_orbital_on_points_local(nurbs_refine, coeff, X, Y, Z, a)
-%Evaluate the tensor-product B-spline orbital coefficients.
+% Evaluate the tensor-product B-spline orbital coefficients.
 U = nurbs_refine.Ubar;
 V = nurbs_refine.Vbar;
 W = nurbs_refine.Wbar;
@@ -466,7 +468,7 @@ end
 end
 
 function [idx0, idx1, w0, w1] = interpolation_weights_for_point_local(x, xq)
-%Compute interpolation weights at one point.
+% Compute interpolation weights at one point.
 tol = 10 * eps(max(1, max(abs(x))));
 idxExact = find(abs(x - xq) <= tol, 1, 'first');
 
@@ -500,7 +502,7 @@ w0 = 1 - w1;
 end
 
 function limits = robust_colormap_limits_local(data, prct)
-%Choose robust color limits.
+% Choose robust color limits.
 data = real(data(:));
 data = data(isfinite(data));
 if isempty(data)
@@ -523,7 +525,7 @@ limits = sanitize_limits(limits);
 end
 
 function [limits, ticks, tickLabels] = slice_colorbar_spec_local(data, prct, fixedTicks, fixedLabels)
-%Return colorbar settings for a slice plot.
+% Return colorbar settings for a slice plot.
 if ~isempty(fixedTicks)
     ticks = fixedTicks(:).';
     limits = [min(ticks), max(ticks)];
@@ -537,7 +539,7 @@ tickLabels = arrayfun(@(x) sprintf('%.3g', x), ticks, 'UniformOutput', false);
 end
 
 function set_colorbar_ticks_local(cb, ticks, ~)
-%Set colorbar tick labels.
+% Set colorbar tick labels.
 cb.Ticks = ticks;
 cb.TickLabels = arrayfun(@format_colorbar_tick_local, ticks, ...
     'UniformOutput', false);
@@ -545,7 +547,7 @@ cb.TickLabelInterpreter = 'latex';
 end
 
 function label = format_colorbar_tick_local(x)
-%Format one colorbar tick label.
+% Format one colorbar tick label.
 if abs(x) < 10 * eps(max(1, abs(x)))
     label = '0';
 else
@@ -554,7 +556,7 @@ end
 end
 
 function style = example1_profile_style_local(cfg)
-%Return profile-line styles.
+% Return profile-line styles.
 style = struct();
 style.figPos = [1, 1, cfg.fig.width, cfg.fig.height];
 style.fontName = cfg.fontName;
@@ -591,7 +593,7 @@ end
 end
 
 function zoomOpt = profile_zoom_options_local(zoomRadius, yPadRatio, insetPosition, tickDecimals)
-%Return zoom-inset options.
+% Return zoom-inset options.
 zoomOpt = struct();
 zoomOpt.radius = zoomRadius;
 zoomOpt.yPadRatio = yPadRatio;
@@ -606,7 +608,7 @@ zoomOpt.zeroGapFraction = [];
 end
 
 function apply_profile_y_padding_local(ax, yData, padRatio)
-%Pad profile-axis limits.
+% Pad profile-axis limits.
 yData = yData(isfinite(yData));
 if isempty(yData)
     return;
@@ -621,14 +623,14 @@ ylim(ax, [yMin - padRatio * ySpan, yMax + padRatio * ySpan]);
 end
 
 function set_tight_profile_layout_local(ax, style)
-%Apply the profile figure layout.
+% Apply the profile figure layout.
 ax.Units = 'normalized';
 ax.Position = style.profileAxesPosition;
 ax.LooseInset = [0, 0, 0, 0];
 end
 
 function set_tight_slice_layout_local(ax, cb, style)
-%Apply the slice figure layout.
+% Apply the slice figure layout.
 ax.Units = 'normalized';
 cb.Units = 'normalized';
 ax.Position = style.sliceAxesPosition;
@@ -637,7 +639,7 @@ ax.LooseInset = [0, 0, 0, 0];
 end
 
 function apply_main_profile_tick_labels_local(ax, tickExponent)
-%Set main profile tick labels.
+% Set main profile tick labels.
 if isempty(tickExponent)
     return;
 end
@@ -655,7 +657,7 @@ text(ax, 0.02, 0.98, sprintf('$\\times 10^{%d}$', tickExponent), ...
 end
 
 function set_main_profile_five_ticks_local(ax, yTickDecimals)
-%Set five ticks on the main profile axis.
+% Set five ticks on the main profile axis.
 ax.XTick = linspace(ax.XLim(1), ax.XLim(2), 5);
 ax.YTick = linspace(ax.YLim(1), ax.YLim(2), 5);
 ax.XTickLabel = arrayfun(@(x) sprintf('%.2f', x), ax.XTick, ...
@@ -665,32 +667,30 @@ ax.YTickLabel = arrayfun(@(x) sprintf(fmt, x), ax.YTick, ...
     'UniformOutput', false);
 end
 
-function [pngFile, pdfFile] = export_named_figure_local(fig, plotRoot, baseName, ~, ~)
-%Export a figure with a fixed filename.
-pngFile = fullfile(plotRoot, [baseName '.png']);
+function pdfFile = export_named_figure_local(fig, plotRoot, baseName, contentType)
+% Export a figure with a fixed filename.
 pdfFile = fullfile(plotRoot, [baseName '.pdf']);
 drawnow;
 set(fig, 'PaperPositionMode', 'auto', 'InvertHardcopy', 'off');
-exportgraphics(fig, pngFile, 'Resolution', 600);
-exportgraphics(fig, pdfFile, 'ContentType', 'vector');
+exportgraphics(fig, pdfFile, 'ContentType', contentType, 'Resolution', 600);
 end
 
 function ensure_dir_local(pathstr)
-%Create a directory when it is missing.
+% Create a directory when it is missing.
 if ~exist(pathstr, 'dir')
     mkdir(pathstr);
 end
 end
 
 function hide_toolbar_local(ax)
-%Hide interactive figure toolbars.
+% Hide interactive figure toolbars.
 if isprop(ax, 'Toolbar') && ~isempty(ax.Toolbar)
     ax.Toolbar.Visible = 'off';
 end
 end
 
 function hLines = plot_profile_pair_local(ax, r, refRadial, cmpRadial, style, refLabel, cmpLabel)
-%Plot two radial profiles together.
+% Plot two radial profiles together.
 markerIdx = marker_indices_by_x_local(r, style.markerCount);
 hLines = plot(ax, r, [refRadial(:), cmpRadial(:)], '-');
 set(hLines(1), 'LineWidth', style.lineWidth, ...
@@ -707,7 +707,7 @@ style_profile_axes_local(ax, style);
 end
 
 function markerIdx = marker_indices_by_x_local(x, markerCount)
-%Place profile markers at approximately uniform x-locations.
+% Place profile markers at approximately uniform x-locations.
 x = x(:);
 valid = find(isfinite(x));
 if isempty(valid)
@@ -733,7 +733,8 @@ markerIdx = unique(markerIdx, 'stable');
 end
 
 function draw_profile_zoom_inset_local(axMain, r, refRadial, cmpRadial, zoomOpt, style)
-%Draw the profile zoom inset.
+% Draw the profile zoom inset.
+% Determine the inset data range and vertical limits.
 mask = r >= 0 & r <= zoomOpt.radius;
 if nnz(mask) < 2
     return;
@@ -777,6 +778,7 @@ elseif ~isempty(zoomOpt.yWindowRatio) && zoomOpt.yWindowRatio > 0 && ...
 end
 xInsetLim = inset_x_limits_local(r, refRadial, cmpRadial, yLim, zoomOpt.radius);
 
+% Mark the enlarged region on the main axes.
 mainYLim = ylim(axMain);
 boxYLim = [max(yLim(1), mainYLim(1)), min(yLim(2), mainYLim(2))];
 if boxYLim(1) >= boxYLim(2)
@@ -787,6 +789,7 @@ line(axMain, [0 xInsetLim(2) xInsetLim(2) 0 0], ...
     'Color', style.zoomColor, 'LineWidth', style.zoomLineWidth, ...
     'LineStyle', '-', 'HandleVisibility', 'off', 'Clipping', 'on');
 
+% Place the inset relative to the main plotting area.
 fig = ancestor(axMain, 'figure');
 drawnow;
 oldUnits = axMain.Units;
@@ -798,6 +801,7 @@ axInset = axes('Parent', fig, 'Position', ...
     [pos(1) + insetRel(1) * pos(3), pos(2) + insetRel(2) * pos(4), ...
     insetRel(3) * pos(3), insetRel(4) * pos(4)], 'Color', 'w');
 
+% Draw both profiles and their sample markers.
 markerIdx = find(r >= xInsetLim(1) & r <= xInsetLim(2));
 markerIdx = markerIdx(unique(round(linspace(1, numel(markerIdx), min(6, numel(markerIdx))))));
 hInset = plot(axInset, r, [refRadial(:), cmpRadial(:)], '-');
@@ -815,6 +819,7 @@ if style.insetMarkerSize > 0
         'MarkerEdgeColor', style.lineColors(1, :), ...
         'MarkerIndices', markerIdx);
 end
+% Format the inset and connect it to the marked region.
 if isempty(zoomOpt.yTicks)
     ticks = linspace(yLim(1), yLim(2), zoomOpt.yTickCount);
 else
@@ -838,7 +843,7 @@ uistack(axInset, 'top');
 end
 
 function xLim = inset_x_limits_local(r, refRadial, cmpRadial, yLim, radius)
-%Return x-limits for the inset.
+% Return x-limits for the inset.
 idx = find(r >= 0 & r <= radius & isfinite(r) & ...
     isfinite(refRadial(:)) & isfinite(cmpRadial(:)));
 if numel(idx) < 2
@@ -856,7 +861,7 @@ xLim = [0, xMax];
 end
 
 function xCross = first_y_boundary_crossing_local(x, y, yLim)
-%Find the first crossing of a y-boundary.
+% Find the first crossing of a y-boundary.
 xCross = x(end);
 if all(y >= yLim(1) & y <= yLim(2))
     return;
@@ -882,7 +887,7 @@ end
 end
 
 function labels = format_zoom_ticks_local(ticks, zoomOpt)
-%Format zoom-inset ticks.
+% Format zoom-inset ticks.
 if ~isempty(zoomOpt.tickExponent)
     ticks = ticks ./ 10^zoomOpt.tickExponent;
 end
@@ -891,7 +896,7 @@ labels = arrayfun(@(x) sprintf(fmt, x), ticks, 'UniformOutput', false);
 end
 
 function draw_zoom_connectors_local(axMain, axInset, xLim, yLim, style)
-%Draw connectors for the zoom inset.
+% Draw connectors for the zoom inset.
 fig = ancestor(axMain, 'figure');
 [xLeft, yTop] = data_to_fig_norm_local(axMain, xLim(1), yLim(2));
 [xRight, ~] = data_to_fig_norm_local(axMain, xLim(2), yLim(2));
@@ -909,7 +914,7 @@ annotation(fig, 'line', [insetPos(1) + insetPos(3), xRight], ...
 end
 
 function [xf, yf] = data_to_fig_norm_local(ax, x, y)
-%Map data coordinates to figure coordinates.
+% Map data coordinates to figure coordinates.
 [xn, yn] = data_to_axes_norm_local(ax, x, y);
 oldUnits = ax.Units;
 ax.Units = 'normalized';
@@ -920,7 +925,7 @@ yf = pos(2) + yn * pos(4);
 end
 
 function [xn, yn] = data_to_axes_norm_local(ax, x, y)
-%Map data coordinates to axes coordinates.
+% Map data coordinates to axes coordinates.
 xLim = ax.XLim;
 yLim = ax.YLim;
 xn = (x - xLim(1)) / (xLim(2) - xLim(1));
@@ -930,7 +935,7 @@ yn = min(max(yn, 0), 1);
 end
 
 function style_profile_axes_local(ax, style)
-%Apply profile-axis styling.
+% Apply profile-axis styling.
 set(ax, 'FontName', style.fontName, 'FontSize', style.fontSize, ...
     'LineWidth', style.axesLineWidth, 'TickDir', style.tickDir, ...
     'XMinorTick', 'off', 'YMinorTick', 'off', ...
@@ -940,7 +945,7 @@ ax.YMinorGrid = 'off';
 end
 
 function style_line_axes_local(ax, cfg)
-%Apply line-axis styling.
+% Apply line-axis styling.
 set(ax, 'FontName', cfg.fontName, 'FontSize', cfg.axes.fontSize, ...
     'LineWidth', cfg.axes.lineWidth, 'TickDir', cfg.axes.tickDir, ...
     'XMinorTick', cfg.axes.xMinorTick, 'YMinorTick', cfg.axes.yMinorTick, ...
@@ -950,7 +955,7 @@ ax.YMinorGrid = 'off';
 end
 
 function styles = build_field_styles_local()
-%Return line and colormap settings for field plots.
+% Return line and colormap settings for field plots.
 styles(1) = struct( ...
     'slice_prct', [1, 99]);
 

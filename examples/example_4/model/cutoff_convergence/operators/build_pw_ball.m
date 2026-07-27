@@ -1,5 +1,5 @@
 function [k_list, n_basis] = build_pw_ball(Nc)
-%Build PW ball.
+% Build the spherical plane-wave index set.
 
 N = floor(Nc);
 

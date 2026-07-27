@@ -28,6 +28,7 @@ info.time_build_prec_total    = 0;
 
 lambda_hist = zeros(scf_maxit, 1);
 
+% Solve the initial linearized ground-state problem.
 n_track_init = min(track_n_eigs, size(Mat0,1) - 1);
 if n_track_init < 1
     n_track_init = 1;
@@ -43,6 +44,7 @@ lambda_old = real(D0(1,1));
 info.time_eigs_total       = info.time_eigs_total + solveInfo0.time_eigs;
 info.time_build_prec_total = info.time_build_prec_total + solveInfo0.time_build_prec;
 
+% Update the nonlinear operator, eigenpair, and mixed state.
 for it = 1:scf_maxit
     [Nmat, ~] = build_nonlinear_operator( ...
         u_old, n_dofs_nurbs, pw_dofs_indices, ...
@@ -87,6 +89,9 @@ for it = 1:scf_maxit
     info.abslambda      = abslambda;
     info.last_branch_id = branch_id;
 
+    fprintf('[SCF-GS] lambda1 = %.12f, iters = %d, abslambda = %.3e\n', ...
+        lambda_new, it, abslambda);
+
     if it >= 3
         if abs(lambda_hist(it) - lambda_hist(it-2)) < 5e-5 && ...
                 abs(lambda_hist(it) - lambda_hist(it-1)) > 2e-4
@@ -103,6 +108,7 @@ for it = 1:scf_maxit
     end
 end
 
+% Assemble the nonlinear operator and solve the final eigenpair.
 [Nmat_final, ~] = build_nonlinear_operator( ...
     u_old, n_dofs_nurbs, pw_dofs_indices, ...
     nurbs_original, nurbs_refine, n_gp, ...
@@ -133,7 +139,7 @@ info.last_branch_id = branch_id_final;
 end
 
 function [u_sel, lambda_sel, idx_sel] = select_branch_by_overlap(Ucand, Dcand, u_prev, M)
-%Select the eigenvector branch by overlap.
+% Select the eigenvector branch by overlap.
 lams = real(diag(Dcand));
 nCand = size(Ucand, 2);
 overlaps = zeros(nCand, 1);
@@ -175,7 +181,7 @@ end
 end
 
 function Pfun = build_interface_block_preconditioner(Ktau, P, eps_diag, iface_reg)
-%Build the TB-DG interface-block preconditioner.
+% Build the TB-DG interface-block preconditioner.
 d = abs(diag(Ktau));
 d(d < eps_diag) = 1;
 gamma = find(sum(abs(P), 2) ~= 0);
@@ -187,24 +193,24 @@ Pfun = @(X) apply_interface_block_preconditioner(X, dinv, gamma, Dg);
 end
 
 function Z = apply_interface_block_preconditioner(X, dinv, gamma, Dg)
-%Apply the TB-DG interface-block preconditioner.
+% Apply the TB-DG interface-block preconditioner.
 Z = bsxfun(@times, X, dinv);
 Z(gamma, :) = Dg \ X(gamma, :);
 end
 
 function [uh, D, rnorms, stats] = call_primme_local(Mat, M, n_eigs, targetShift, ops, primme_method, Pfun)
-%Call PRIMME for the local eigenproblem.
+% Call PRIMME for the local eigenproblem.
 [uh, D, rnorms, stats] = primme_eigs(Mat, M, n_eigs, targetShift, ops, primme_method, Pfun);
 end
 
 function u = normalize_in_M(u, M)
-%Normalize an eigenvector in the mass inner product.
+% Normalize an eigenvector in the mass inner product.
 nu = real(u' * M * u);
 u = u / sqrt(abs(nu));
 end
 
 function u = fix_global_phase_single_pw(u, n_dofs_nurbs, k_pw)
-%Fix the global phase using one plane-wave coefficient.
+% Fix the global phase using one plane-wave coefficient.
 u_pw = u(n_dofs_nurbs+1:end);
 [~, idx] = max(abs(u_pw));
 k0 = k_pw(idx, :);
@@ -228,7 +234,7 @@ end
 end
 
 function u_new = align_phase_to_previous(u_new, u_old, M)
-%Align the eigenvector phase to the previous iterate.
+% Align the eigenvector phase to the previous iterate.
 alpha = u_old' * M * u_new;
 if abs(alpha) > 0
     u_new = exp(-1i * angle(alpha)) * u_new;

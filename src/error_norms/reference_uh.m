@@ -1,5 +1,5 @@
 function uh_at_uv   = reference_uh(nurbs_refine,uh,u,v)
-%Evaluate the reference solution.
+% Evaluate the reference solution.
 
 % This script is used to compute the reference solution uh at the
 % parametric point (u,v)

@@ -1,5 +1,5 @@
-﻿function plot_eigen_error()
-%Plot eigen error.
+function plot_eigen_error()
+% Plot eigen error.
 
 clc; close all; format short e;
 
@@ -8,7 +8,9 @@ set(groot, ...
     'defaultLegendInterpreter','latex', ...
     'defaultAxesTickLabelInterpreter','latex');
 
-%% Section
+prepare_example_2_plot_context(mfilename('fullpath'));
+
+% Set current, reference, quadrature, and plot-range parameters.
 Example     = 'Example_2';
 
 Nc_fixed    = 30;
@@ -19,7 +21,7 @@ ref_Nc      = 45;
 ref_pdeg    = 3;
 ref_refine  = 8;
 
-u_list      = [1 2];
+u_list      = [1 2 3];
 
 L           = 4;
 a           = 0.2;
@@ -33,24 +35,20 @@ dx_out      = 5e-3;
 chunkSize   = 20000;
 
 slope1_factor = 0.05;
-slope2_factor = 0.001;
+slope2_factor = 0.0003;
 
 padX = 0.4;
 padY = 0.4;
 
-savePNG = true;
-savePDF = true;
-pngDPI  = 600;
-
-%% Section
+% Define figure, axes, and curve styles.
 cfg = struct();
 
-cfg.fig.width    = 4.8;
-cfg.fig.height   = 3.0;
+cfg.fig.width    = 5.039;
+cfg.fig.height   = 3.0045;
 cfg.fig.renderer = 'painters';
 cfg.fig.bgColor  = 'w';
 
-cfg.layout.left   = 0.14;
+cfg.layout.left   = 0.18;
 cfg.layout.right  = 0.04;
 cfg.layout.bottom = 0.16;
 cfg.layout.top    = 0.08;
@@ -61,29 +59,29 @@ cfg.axes.tickDir    = 'out';
 cfg.axes.xMinorTick = 'off';
 cfg.axes.yMinorTick = 'off';
 
-cfg.curve.lineWidth       = 2.0;
-cfg.curve.markerSize      = 7;
+cfg.curve.lineWidth       = 1.8;
+cfg.curve.markerSize      = 8;
 cfg.curve.markerFaceColor = 'w';
 
 cfg.label.fontSize = 12;
 
-%% Section
+% Set fixed axis limits and ticks.
 axisSpec.XTick      = [];
 axisSpec.XTickLabel = {};
 axisSpec.XLim       = [];
 
 axisSpec.YTick      = 10.^[-6 -4 -2 0];
 axisSpec.YTickLabel = {'$10^{-6}$','$10^{-4}$','$10^{-2}$','$10^{0}$'};
-axisSpec.YLim       = [1e-6, 1e0];
+axisSpec.YLim       = [1e-7, 1e0];
 
-%% Section
-legendSpec.xL1 = 0.37;
-legendSpec.xL2 = 0.47;
-legendSpec.xLT = 0.48;
+% Set manual in-axes legend positions.
+legendSpec.xL1 = 0.40;
+legendSpec.xL2 = 0.50;
+legendSpec.xLT = 0.52;
 
-legendSpec.xR1 = 0.67;
-legendSpec.xR2 = 0.83;
-legendSpec.xRT = 0.85;
+legendSpec.xR1 = 0.70;
+legendSpec.xR2 = 0.88;
+legendSpec.xRT = 0.90;
 
 legendSpec.rowY      = [0.4, 0.3, 0.2, 0.1];
 legendSpec.slopeRows = [3, 4];
@@ -92,25 +90,24 @@ legendSpec.slope1Label = '$\mathrm{Slope} = 1$';
 legendSpec.slope2Label = '$\mathrm{Slope} = 2$';
 legendSpec.fontSize    = 10;
 
-%% Section
+% Define curve and reference-slope colors.
 lineColors = [ ...
     223 122 094;
     060 064 091;
-    130 178 154;
-    242 204 142] / 255;
+    130 178 154] / 255;
 
 slope1Color = [239 065 067] / 255;
 slope2Color = [033 158 188] / 255;
 
-%% Section
+% Resolve the h-convergence workflow and output paths.
 activate_example_workflow('h_convergence', ...
     {'nurbs', 'iga', 'assembly', ...
-    'operators', 'error_norms', 'core', 'solver'});
+    'operators', 'error_norms', 'core'});
 
-ExampleRoot = find_example_root(pwd, Example);
+ExampleRoot = fullfile(pwd, 'result', Example);
+assert(isfolder(ExampleRoot), 'Missing Example 2 result directory: %s', ExampleRoot);
 
 dxTag  = make_dx_tag(dx_in, dx_out);
-refTag = make_refine_tag(refine_list);
 
 outDir = fullfile(ExampleRoot, 'eigen_error', ...
     sprintf('Nc_%d', Nc_fixed), dxTag);
@@ -122,21 +119,21 @@ end
 errCsvFile  = fullfile(outDir, 'errors.csv');
 rateCsvFile = fullfile(outDir, 'rates.csv');
 
-pngFile = fullfile(outDir, 'eigen_error.png');
 pdfFile = fullfile(outDir, 'eigen_error.pdf');
 
-%% Section
+% Align current plane-wave indices with the reference basis.
 [p_vec_curr, n_pw_curr] = generate_p_vec(Nc_fixed);
 [p_vec_ref,  n_pw_ref ] = generate_p_vec(ref_Nc);
 
 [tf_k, loc_k] = ismember(p_vec_curr, p_vec_ref, 'rows');
 
-%% Section
+% Load or compute eigenfunction errors for the selected degree.
 fprintf('\n==================== p = %d ====================\n', pdeg);
 
 requiredVars = {'refine','dx', ...
     'u1_L2','u1_DG', ...
     'u2_L2','u2_DG', ...
+    'u3_L2','u3_DG', ...
     'ref_Nc','ref_pdeg','ref_refine'};
 
 needRecompute = true;
@@ -170,12 +167,9 @@ if needRecompute
         error('Missing reference run file: %s', ref_runMat);
     end
 
-    S = load(ref_runMat);
-    if isfield(S,'run')
-        Rref = S.run;
-    else
-        Rref = S;
-    end
+    S = load(ref_runMat, 'run');
+    assert(isfield(S, 'run'), 'Reference MAT file does not contain run.');
+    Rref = S.run;
 
     ref = extract_run_data_example2(Rref, n_pw_ref);
 
@@ -183,10 +177,6 @@ if needRecompute
         ref_Nc, ref_pdeg, ref_refine, ref.nNURBS, ref.n_dofs_1, ref.n_dofs_2);
 
     runs = load_runs_over_refine_example2(ExampleRoot, Nc_fixed, pdeg, refine_list, n_pw_curr);
-    if isempty(runs)
-        error('p=%d has missing or invalid run data.', pdeg);
-        return;
-    end
 
     nR = numel(runs);
 
@@ -265,6 +255,7 @@ if needRecompute
         refine_loaded, dx_axis, ...
         eL2(:,1), eDG(:,1), ...
         eL2(:,2), eDG(:,2), ...
+        eL2(:,3), eDG(:,3), ...
         repmat(ref_Nc, nR, 1), ...
         repmat(ref_pdeg, nR, 1), ...
         repmat(ref_refine, nR, 1), ...
@@ -273,17 +264,15 @@ if needRecompute
     writetable(T, errCsvFile);
 end
 
-%% Section
+% Filter the requested refinements and assemble plotted errors.
 T = T(ismember(T.refine, refine_list), :);
 T = sortrows(T, 'refine');
 
 if isempty(T)
     error('p=%d has missing or invalid run data.', pdeg);
-    return;
 end
 
-Y = [T.u1_L2, T.u1_DG, ...
-    T.u2_L2, T.u2_DG];
+Y = [T.u1_DG, T.u2_DG, T.u3_DG];
 
 x_axis = T.dx;
 Y(Y <= 0) = eps;
@@ -292,10 +281,9 @@ T_rate = build_local_rate_table(T, pdeg);
 writetable(T_rate, rateCsvFile);
 
 curveLabels = { ...
-    '$u_1,\ L^2$', ...
-    '$u_1,\ \mathrm{DG}$', ...
-    '$u_2,\ L^2$', ...
-    '$u_2,\ \mathrm{DG}$'};
+    '$i=1$', ...
+    '$i=2$', ...
+    '$i=3$'};
 
 fig = figure('Color', cfg.fig.bgColor, ...
     'Units','inches', ...
@@ -324,7 +312,7 @@ set(ax, ...
 
 grid(ax,'off');
 
-mk = {'o','s','^','d'};
+mk = {'s','d','>'};
 hCurve = gobjects(numel(curveLabels),1);
 
 for k = 1:numel(curveLabels)
@@ -357,27 +345,20 @@ xlabel(ax, '$h$', ...
     'FontSize', cfg.label.fontSize, ...
     'Interpreter', 'latex');
 
-ylabel(ax, '$\|u_i-u_{i}^{\mathrm{DG}}\|$', ...
+ylabel(ax, '$\|u_i-u_{i}^{\mathrm{DG}}\|_{\mathrm{DG}}$', ...
     'FontSize', cfg.label.fontSize, ...
     'Interpreter', 'latex');
 
 apply_manual_log_axes(ax, x_axis, Y, yref1, yref2, axisSpec, padX, padY);
 draw_fake_legend_in_axes(ax, hCurve, hSlope1, hSlope2, curveLabels, legendSpec);
 
-if savePNG
-    exportgraphics(fig, pngFile, 'Resolution', pngDPI);
-    fprintf('[SAVE] %s\n', pngFile);
-end
-
-if savePDF
-    exportgraphics(fig, pdfFile, 'ContentType', 'vector');
-    fprintf('[SAVE] %s\n', pdfFile);
-end
+exportgraphics(fig, pdfFile, 'ContentType', 'vector');
+fprintf('[SAVE] %s\n', pdfFile);
 
 end
 
 function ref = extract_run_data_example2(R, n_pw_basis)
-%Extract run data example2.
+% Extract the Example 2 reference fields from one saved run.
 
 ref = struct();
 
@@ -387,33 +368,24 @@ ref.nurbs_original_1 = R.nurbs_original_1;
 ref.nurbs_refine_1   = R.nurbs_refine_1;
 ref.nurbs_original_2 = R.nurbs_original_2;
 ref.nurbs_refine_2   = R.nurbs_refine_2;
-
-if isfield(R,'n_dofs_1') && isfield(R,'n_dofs_2')
-    ref.n_dofs_1 = double(R.n_dofs_1);
-    ref.n_dofs_2 = double(R.n_dofs_2);
-else
-    ref.n_dofs_1 = get_patch_ndofs(R.nurbs_refine_1);
-    ref.n_dofs_2 = get_patch_ndofs(R.nurbs_refine_2);
-end
-
-if isfield(R,'n_dofs_nurbs') && ~isempty(R.n_dofs_nurbs)
-    ref.nNURBS = double(R.n_dofs_nurbs);
-else
-    ref.nNURBS = ref.n_dofs_1 + ref.n_dofs_2;
-end
-
-if ref.nNURBS ~= ref.n_dofs_1 + ref.n_dofs_2
-    error('Inconsistent numerical data.');
-end
-
-ref.n_pw_basis = n_pw_basis;
+requiredFields = {'n_dofs_1', 'n_dofs_2', 'n_dofs_nurbs', 'n_pw_basis'};
+assert(all(isfield(R, requiredFields)), ...
+    'Reference run is missing dimension metadata.');
+ref.n_dofs_1 = double(R.n_dofs_1);
+ref.n_dofs_2 = double(R.n_dofs_2);
+ref.nNURBS = double(R.n_dofs_nurbs);
+ref.n_pw_basis = double(R.n_pw_basis);
+assert(ref.nNURBS == ref.n_dofs_1 + ref.n_dofs_2, ...
+    'Reference NURBS dimensions are inconsistent.');
+assert(ref.n_pw_basis == n_pw_basis, ...
+    'Reference plane-wave dimension is inconsistent.');
 
 end
 
 function T_rate = build_local_rate_table(T, pdeg)
-%Build local rate table.
+% Build local rate table.
 
-metricNames = {'u1_L2','u1_DG','u2_L2','u2_DG'};
+metricNames = {'u1_L2','u1_DG','u2_L2','u2_DG','u3_L2','u3_DG'};
 n = height(T);
 
 if n < 2
@@ -451,7 +423,7 @@ T_rate = cell2table(Rows, ...
 end
 
 function apply_manual_log_axes(ax, x_axis, Y, yref1, yref2, spec, padX, padY)
-%Apply manual log axes.
+% Apply manual log axes.
 
 xAll = x_axis(:);
 yAll = [Y(:); yref1(:); yref2(:)];
@@ -502,7 +474,7 @@ end
 end
 
 function idx = choose_anchor_index(xGrid)
-%Choose the point used for slope annotation.
+% Choose the point used for slope annotation.
 
 n = numel(xGrid);
 
@@ -515,11 +487,11 @@ end
 end
 
 function draw_fake_legend_in_axes(ax, hCurve, hSlope1, hSlope2, curveLabels, spec)
-%Draw fake legend in axes.
+% Draw an in-axes legend using proxy curves.
 
 for j = 1:numel(curveLabels)
     draw_one_fake_entry_in_axes(ax, hCurve(j), ...
-        spec.xR1, spec.xR2, spec.xRT, spec.rowY(j), curveLabels{j}, spec.fontSize);
+        spec.xR1, spec.xR2, spec.xRT, spec.rowY(j+1), curveLabels{j}, spec.fontSize);
 end
 
 draw_one_fake_entry_in_axes(ax, hSlope1, ...
@@ -531,8 +503,9 @@ draw_one_fake_entry_in_axes(ax, hSlope2, ...
 end
 
 function draw_one_fake_entry_in_axes(ax, hLine, x1n, x2n, xtn, yn, labelStr, fontSize)
-%Draw one fake entry in axes.
+% Draw one manual legend entry inside the axes.
 
+% Read the source line and marker styling.
 c  = get(hLine, 'Color');
 ls = get(hLine, 'LineStyle');
 lw = get(hLine, 'LineWidth');
@@ -558,21 +531,22 @@ if isprop(hLine, 'MarkerEdgeColor')
     mec = get(hLine, 'MarkerEdgeColor');
 end
 
+% Convert normalized legend positions to data coordinates.
 [x1, y1] = axes_norm_to_data(ax, x1n, yn);
-[x2, y2] = axes_norm_to_data(ax, x2n, yn);
+[x2, ~ ] = axes_norm_to_data(ax, x2n, yn);
 [xt, yt] = axes_norm_to_data(ax, xtn, yn);
 
 xm = 0.49 * (x1 + x2);
-ym = y1;
 
-line(ax, [x1 x2], [y1 y2], ...
+% Draw the line sample, marker, and label.
+line(ax, [x1 x2], [y1 y1], ...
     'LineStyle', ls, ...
     'Color', c, ...
     'LineWidth', lw, ...
     'Marker', 'none', ...
     'Clipping', 'off');
 
-line(ax, xm, ym, ...
+line(ax, xm, y1, ...
     'LineStyle', 'none', ...
     'Color', c, ...
     'Marker', mk, ...
@@ -594,7 +568,7 @@ text(ax, xt, yt, labelStr, ...
 end
 
 function [x, y] = axes_norm_to_data(ax, xn, yn)
-%Compute norm to data.
+% Convert normalized axes coordinates to data coordinates.
 
 xlimv = ax.XLim;
 ylimv = ax.YLim;
@@ -618,7 +592,7 @@ end
 end
 
 function err = iga_L2_error_example2(currRun, cNURBS, refRun, rNURBS, patchCenters, a, dx)
-%Compute L2 error example2.
+% Compute the IGA-region L2 error against the reference grid.
 
 [X, Y, patchId, wA] = grid_points_inner_example2(patchCenters, a, dx);
 
@@ -631,7 +605,7 @@ err = sqrt(sum(abs(dv).^2) * wA);
 end
 
 function err = pw_L2_error_example2(cPW, p_curr, rPW, p_ref, L, patchCenters, a, dx, chunkSize)
-%Compute L2 error example2.
+% Compute the plane-wave-region L2 error against the reference grid.
 
 dy = dx;
 x = -L/2 + dx/2 : dx : L/2 - dx/2;
@@ -684,6 +658,7 @@ currRun, cNURBS, cPW, ...
     p_vec_curr, p_vec_ref, L, patchCenters, a, ...
     dx_in, dx_out, chunkSize, sigma)
 
+% Compute the Example 2 DG eigenfunction error.
 [xi, yi, patchId, wA_in] = grid_points_inner_example2(patchCenters, a, dx_in);
 
 [vC, vxC, vyC] = iga_eval_val_grad_example2(currRun, cNURBS, xi, yi, patchId, patchCenters, a);
@@ -736,7 +711,7 @@ errDG = sqrt(H1_in + H1_out + sigma * J2);
 end
 
 function [val, gx, gy] = pw_eval_val_grad(coeff, p_vec, X, Y, L)
-%Evaluate the field value and gradient.
+% Evaluate the field value and gradient.
 
 F = [X(:)'; Y(:)'];
 expo = exp((1i * 2*pi / L) * (p_vec * F));
@@ -754,14 +729,14 @@ gy  = gy(:);
 end
 
 function val = iga_eval_val_example2(runData, coeff, X, Y, patchId, patchCenters, a)
-%Evaluate the Example 2 field value.
+% Evaluate the Example 2 field value.
 
 [val, ~, ~] = iga_eval_val_grad_example2(runData, coeff, X, Y, patchId, patchCenters, a);
 
 end
 
 function [val, gx, gy] = iga_eval_val_grad_example2(runData, coeff, X, Y, patchId, patchCenters, a)
-%Evaluate the Example 2 field value and gradient.
+% Evaluate the Example 2 field value and gradient.
 
 n1 = runData.n_dofs_1;
 n2 = runData.n_dofs_2;
@@ -800,7 +775,7 @@ end
 end
 
 function [v, gx, gy] = iga_eval_on_one_patch(nurbs, coeff, X, Y, xc, yc, a)
-%Compute eval on one patch.
+% Evaluate one IGA patch at the requested Cartesian points.
 
 pu = nurbs.pu;
 pv = nurbs.pv;
@@ -847,7 +822,7 @@ gy = sv / (2*a);
 end
 
 function [N, dN] = bspline_basis_and_der1(U, p, u, span)
-%Evaluate basis values and first derivatives.
+% Evaluate basis values and first derivatives.
 
 ndu = zeros(p+1, p+1);
 left = zeros(1, p+1);
@@ -894,7 +869,7 @@ dN = ders1 * p;
 end
 
 function span = findspan_local(n, p, u, U)
-%Locate an index or object used by the computation.
+% Find the active knot span for a parameter value.
 
 if u >= U(n+2)
     span = n+1;
@@ -925,7 +900,7 @@ span = mid;
 end
 
 function [X, Y, patchId, wA] = grid_points_inner_example2(patchCenters, a, dx)
-%Build inner-region quadrature points for Example 2.
+% Build inner-region quadrature points for Example 2.
 
 X = [];
 Y = [];
@@ -949,7 +924,7 @@ wA = dx*dx;
 end
 
 function [X, Y, wA] = grid_points_outer_example2(L, patchCenters, a, dx)
-%Build outer-region quadrature points for Example 2.
+% Build outer-region quadrature points for Example 2.
 
 x = -L/2 + dx/2 : dx : L/2 - dx/2;
 y = x;
@@ -972,7 +947,7 @@ wA = dx*dx;
 end
 
 function [X, Y, patchId, wL] = boundary_points_example2(patchCenters, a, ds)
-%Build interface quadrature points for Example 2.
+% Build interface quadrature points for Example 2.
 
 X = [];
 Y = [];
@@ -1002,7 +977,7 @@ wL = ds;
 end
 
 function h = estimate_h_parametric_example2(runData)
-%Estimate the Example 2 parametric mesh size.
+% Estimate the Example 2 parametric mesh size.
 
 h1 = estimate_h_parametric_one(runData.nurbs_refine_1);
 h2 = estimate_h_parametric_one(runData.nurbs_refine_2);
@@ -1011,7 +986,7 @@ h = max(h1, h2);
 end
 
 function h = estimate_h_parametric_one(nurbs)
-%Estimate one parametric mesh size.
+% Estimate one parametric mesh size.
 
 Uu = unique(nurbs.Ubar(:).');
 Vv = unique(nurbs.Vbar(:).');
@@ -1019,17 +994,8 @@ h  = max(max(diff(Uu)), max(diff(Vv)));
 
 end
 
-function nd = get_patch_ndofs(nurbs)
-%Return patch ndofs.
-
-mU = length(nurbs.Ubar(:).') - nurbs.pu - 1;
-mV = length(nurbs.Vbar(:).') - nurbs.pv - 1;
-nd = mU * mV;
-
-end
-
 function [p_vec, n_pw_basis] = generate_p_vec(Nc)
-%Generate p vec.
+% Build the two-dimensional plane-wave index set for one cutoff.
 
 N = floor(Nc);
 p_vec = zeros((2*N+1)^2, 2);
@@ -1049,13 +1015,14 @@ p_vec = p_vec(1:n_pw_basis, :);
 end
 
 function runs = load_runs_over_refine_example2(ExampleRoot, Nc_fixed, pdeg, refine_list, n_pw_curr)
-%Load runs over refine example2.
+% Load the retained Example 2 runs over all refinement levels.
 
-runs = struct('refine',{}, ...
-    'nurbs_original_1',{},'nurbs_refine_1',{}, ...
-    'nurbs_original_2',{},'nurbs_refine_2',{}, ...
-    'n_dofs_1',{},'n_dofs_2',{},'nNURBS',{}, ...
-    'uh',{});
+template = struct('refine', 0, ...
+    'nurbs_original_1', [], 'nurbs_refine_1', [], ...
+    'nurbs_original_2', [], 'nurbs_refine_2', [], ...
+    'n_dofs_1', 0, 'n_dofs_2', 0, 'nNURBS', 0, ...
+    'uh', []);
+runs = repmat(template, numel(refine_list), 1);
 
 for i = 1:numel(refine_list)
     rf = refine_list(i);
@@ -1063,17 +1030,10 @@ for i = 1:numel(refine_list)
     runMat = fullfile(ExampleRoot, sprintf('Nc_%d',Nc_fixed), sprintf('p_%d',pdeg), ...
         sprintf('refine_%02d',rf), 'run.mat');
 
-    if ~exist(runMat,'file')
-        continue;
-    end
-
-    S = load(runMat);
-
-    if isfield(S,'run')
-        R = S.run;
-    else
-        R = S;
-    end
+    assert(isfile(runMat), 'Missing run file: %s', runMat);
+    S = load(runMat, 'run');
+    assert(isfield(S, 'run'), 'MAT file does not contain run: %s', runMat);
+    R = S.run;
 
     rr.refine = rf;
 
@@ -1083,61 +1043,42 @@ for i = 1:numel(refine_list)
     rr.nurbs_refine_2   = R.nurbs_refine_2;
     rr.uh               = R.uh;
 
-    if isfield(R,'n_dofs_1') && isfield(R,'n_dofs_2')
-        rr.n_dofs_1 = double(R.n_dofs_1);
-        rr.n_dofs_2 = double(R.n_dofs_2);
-    else
-        rr.n_dofs_1 = get_patch_ndofs(R.nurbs_refine_1);
-        rr.n_dofs_2 = get_patch_ndofs(R.nurbs_refine_2);
-    end
-
-    if isfield(R,'n_dofs_nurbs') && ~isempty(R.n_dofs_nurbs)
-        rr.nNURBS = double(R.n_dofs_nurbs);
-    else
-        rr.nNURBS = size(R.uh,1) - n_pw_curr;
-    end
-
-    if rr.nNURBS ~= rr.n_dofs_1 + rr.n_dofs_2
-        error('refine=%d has inconsistent NURBS degrees of freedom.', rf);
-    end
-
-    runs(end+1) = rr; %#ok<AGROW>
+    requiredFields = {'n_dofs_1', 'n_dofs_2', ...
+        'n_dofs_nurbs', 'n_pw_basis'};
+    assert(all(isfield(R, requiredFields)), ...
+        'Run is missing dimension metadata: %s', runMat);
+    rr.n_dofs_1 = double(R.n_dofs_1);
+    rr.n_dofs_2 = double(R.n_dofs_2);
+    rr.nNURBS = double(R.n_dofs_nurbs);
+    assert(rr.nNURBS == rr.n_dofs_1 + rr.n_dofs_2, ...
+        'refine=%d has inconsistent NURBS degrees of freedom.', rf);
+    assert(double(R.n_pw_basis) == n_pw_curr, ...
+        'refine=%d has an inconsistent plane-wave dimension.', rf);
+    runs(i) = rr;
 end
 
 end
 
-function root = find_example_root(startDir, Example)
-%Locate an index or object used by the computation.
+function prepare_example_2_plot_context(scriptFile)
+% Prepare paths relative to this example script.
 
-root = startDir;
+figuresDir = fileparts(scriptFile);
+exampleDir = fileparts(figuresDir);
+projectDir = fileparts(fileparts(exampleDir));
+utilsDir   = fullfile(projectDir, 'src', 'utils');
+dataDir    = fullfile(exampleDir, 'data');
 
-for k = 1:10
-    if ~isempty(dir(fullfile(root,'Nc_*')))
-        return;
-    end
+assert(isfolder(utilsDir), 'Missing utility directory: %s', utilsDir);
+assert(isfolder(dataDir), 'Missing data directory: %s', dataDir);
 
-    cand = fullfile(root,'result',Example);
-
-    if exist(cand,'dir') && ~isempty(dir(fullfile(cand,'Nc_*')))
-        root = cand;
-        return;
-    end
-
-    parent = fileparts(root);
-
-    if strcmp(parent,root)
-        break;
-    end
-
-    root = parent;
-end
-
-error('Cannot locate data directory for %s.', Example);
+addpath(utilsDir, '-begin');
+add_example_paths(exampleDir);
+cd(dataDir);
 
 end
 
 function dxTag = make_dx_tag(dx_in, dx_out)
-%Build dx tag.
+% Encode the inner and outer grid spacings in a filename tag.
 
 sx = dx_to_str(dx_in);
 sy = dx_to_str(dx_out);
@@ -1150,18 +1091,8 @@ end
 
 end
 
-function refTag = make_refine_tag(refine_list)
-%Build refine tag.
-
-refine_list = unique(refine_list(:).');
-refine_str = sprintf('%d_', refine_list);
-refine_str(end) = [];
-refTag = ['r_' refine_str];
-
-end
-
 function s = dx_to_str(dx)
-%Compute to str.
+% Convert a numeric value to compact text.
 
 s = sprintf('%.1e', dx);
 s = strrep(s, '.', 'p');
@@ -1170,7 +1101,7 @@ s = strrep(s, '+', '');
 end
 
 function y = round_sig(x, nSig)
-%Round a value to significant digits.
+% Round a value to significant digits.
 
 y = x;
 mask = isfinite(x) & (x ~= 0);

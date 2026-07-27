@@ -1,11 +1,12 @@
 function run_reference(Nc, pdeg, refines)
-%Generate the fine-grid reference data.
+% Generate the fine-grid reference data.
 
 clc; close all;
 
+% Set workflow paths and reference-case parameters.
 activate_example_workflow('h_convergence', ...
     {'nurbs', 'iga', 'assembly', ...
-    'operators', 'error_norms', 'core', 'solver'});
+    'operators', 'error_norms', 'core'});
 exampleDir = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 dataDir = fullfile(exampleDir, 'data');
 oldDir = pwd;
@@ -13,15 +14,6 @@ cleanupObj = onCleanup(@() cd(oldDir));
 cd(dataDir);
 
 Example = 'Example_2';
-if nargin < 1 || isempty(Nc)
-    Nc = 45;
-end
-if nargin < 2 || isempty(pdeg)
-    pdeg = 3;
-end
-if nargin < 3 || isempty(refines)
-    refines = 8;
-end
 t = pdeg - 1;
 n_eigenvalues = 4;
 
@@ -59,6 +51,7 @@ n_dofs = zeros(n_ref, 1);
 fprintf('[INFO] caseDir = %s\n', caseDir);
 fprintf('[INFO] Refines to record = %s\n', mat2str(refines.'));
 
+% Solve every requested reference refinement.
 for ii = 1:n_ref
     refine = refines(ii);
     runDir = fullfile(caseDir, sprintf('refine_%02d', refine));
@@ -97,6 +90,7 @@ for ii = 1:n_ref
     n_dofs(ii) = ndof;
 end
 
+% Merge and save the reference summary.
 Tnew = table(refines(:), n_dofs, 'VariableNames', {'refine','dof'});
 for k = 1:n_eigenvalues
     Tnew.(sprintf('lambda%d', k)) = Lambda_h(:, k);

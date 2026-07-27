@@ -1,5 +1,5 @@
 ﻿function faceData = build_face_data_3D(nurbs_refine, a, L, N, method)
-%Build face data 3D.
+% Build trace, normal, and coupling data for all six cube faces.
 
 arguments
     nurbs_refine
@@ -9,6 +9,7 @@ arguments
     method = 'tensor'
 end
 
+% Extract the spline data and plane-wave frequencies.
 faceNames = {'x-','x+','y-','y+','z-','z+'};
 faceData = cell(numel(faceNames),1);
 
@@ -30,6 +31,7 @@ WBreaks = nurbs_refine.WBreaks;
 alpha = 2*pi/L;
 kvals = -N:N;
 
+% Select the requested face-assembly formulation.
 if ~strcmpi(method, 'legacy')
     faceData = build_face_data_tensor_fast_local( ...
         m, n, l, pu, pv, pw, Ubar, Vbar, Wbar, UBreaks, VBreaks, WBreaks, ...
@@ -37,6 +39,7 @@ if ~strcmpi(method, 'legacy')
     return;
 end
 
+% Assemble trace and normal-derivative matrices on all six faces.
 for iface = 1:numel(faceNames)
     fname = faceNames{iface};
 
@@ -46,6 +49,7 @@ for iface = 1:numel(faceNames)
             fixedCoord = -a + 2*a*fixedParam;
             normalSign = -1 + 2*double(strcmp(fname,'x+'));
 
+            % Build tangential quadrature for an x-normal face.
             [nodes1, w1, span1] = build_1d_face_nodes(VBreaks, Vbar, pv, a);
             [nodes2, w2, span2] = build_1d_face_nodes(WBreaks, Wbar, pw, a);
 
@@ -58,7 +62,6 @@ for iface = 1:numel(faceNames)
                 w = (nodes2(j2) + a)/(2*a);
                 Wders = bspbasisDers(Wbar, pw, w, 1);
                 Nw  = Wders(1,:)';
-                DNw = Wders(2,:)';
                 kList = span2(j2)-pw : span2(j2);
 
                 for j1 = 1:numel(nodes1)
@@ -67,7 +70,6 @@ for iface = 1:numel(faceNames)
                     v = (nodes1(j1) + a)/(2*a);
                     Vders = bspbasisDers(Vbar, pv, v, 1);
                     Nv  = Vders(1,:)';
-                    DNv = Vders(2,:)';
                     jList = span1(j1)-pv : span1(j1);
 
                     Uders = bspbasisDers(Ubar, pu, fixedParam, 1);
@@ -98,9 +100,11 @@ for iface = 1:numel(faceNames)
                 end
             end
 
+            % Precompute tangential plane-wave phase matrices.
             E1 = exp(1i * alpha * (nodes1(:) * kvals));
             E2 = exp(1i * alpha * (nodes2(:) * kvals));
 
+            % Store the x-face quadrature and coupling operators.
             F = struct();
             F.name       = fname;
             F.type       = 'x';
@@ -120,6 +124,7 @@ for iface = 1:numel(faceNames)
             fixedCoord = -a + 2*a*fixedParam;
             normalSign = -1 + 2*double(strcmp(fname,'y+'));
 
+            % Build tangential quadrature for a y-normal face.
             [nodes1, w1, span1] = build_1d_face_nodes(UBreaks, Ubar, pu, a);
             [nodes2, w2, span2] = build_1d_face_nodes(WBreaks, Wbar, pw, a);
 
@@ -132,7 +137,6 @@ for iface = 1:numel(faceNames)
                 w = (nodes2(j2) + a)/(2*a);
                 Wders = bspbasisDers(Wbar, pw, w, 1);
                 Nw  = Wders(1,:)';
-                DNw = Wders(2,:)';
                 kList = span2(j2)-pw : span2(j2);
 
                 for j1 = 1:numel(nodes1)
@@ -141,7 +145,6 @@ for iface = 1:numel(faceNames)
                     u = (nodes1(j1) + a)/(2*a);
                     Uders = bspbasisDers(Ubar, pu, u, 1);
                     Nu  = Uders(1,:)';
-                    DNu = Uders(2,:)';
                     iList = span1(j1)-pu : span1(j1);
 
                     Vders = bspbasisDers(Vbar, pv, fixedParam, 1);
@@ -172,9 +175,11 @@ for iface = 1:numel(faceNames)
                 end
             end
 
+            % Precompute tangential plane-wave phase matrices.
             E1 = exp(1i * alpha * (nodes1(:) * kvals));
             E2 = exp(1i * alpha * (nodes2(:) * kvals));
 
+            % Store the y-face quadrature and coupling operators.
             F = struct();
             F.name       = fname;
             F.type       = 'y';
@@ -194,6 +199,7 @@ for iface = 1:numel(faceNames)
             fixedCoord = -a + 2*a*fixedParam;
             normalSign = -1 + 2*double(strcmp(fname,'z+'));
 
+            % Build tangential quadrature for a z-normal face.
             [nodes1, w1, span1] = build_1d_face_nodes(UBreaks, Ubar, pu, a);
             [nodes2, w2, span2] = build_1d_face_nodes(VBreaks, Vbar, pv, a);
 
@@ -206,7 +212,6 @@ for iface = 1:numel(faceNames)
                 v = (nodes2(j2) + a)/(2*a);
                 Vders = bspbasisDers(Vbar, pv, v, 1);
                 Nv  = Vders(1,:)';
-                DNv = Vders(2,:)';
                 jList = span2(j2)-pv : span2(j2);
 
                 for j1 = 1:numel(nodes1)
@@ -215,7 +220,6 @@ for iface = 1:numel(faceNames)
                     u = (nodes1(j1) + a)/(2*a);
                     Uders = bspbasisDers(Ubar, pu, u, 1);
                     Nu  = Uders(1,:)';
-                    DNu = Uders(2,:)';
                     iList = span1(j1)-pu : span1(j1);
 
                     Wders = bspbasisDers(Wbar, pw, fixedParam, 1);
@@ -246,9 +250,11 @@ for iface = 1:numel(faceNames)
                 end
             end
 
+            % Precompute tangential plane-wave phase matrices.
             E1 = exp(1i * alpha * (nodes1(:) * kvals));
             E2 = exp(1i * alpha * (nodes2(:) * kvals));
 
+            % Store the z-face quadrature and coupling operators.
             F = struct();
             F.name       = fname;
             F.type       = 'z';
@@ -271,7 +277,7 @@ end
 end
 
 function [nodes, wphys, span] = build_1d_face_nodes(Breaks, Ubar, p, a)
-%Build 1d face nodes.
+% Build one-dimensional face quadrature nodes, weights, and spans.
 [gp, gw] = grule(10*p + 5);
 nel = length(Breaks) - 1;
 nq  = numel(gp);
@@ -280,6 +286,7 @@ nodes = zeros(nel*nq, 1);
 wphys = zeros(nel*nq, 1);
 span  = zeros(nel*nq, 1);
 
+% Map each knot-span quadrature rule to physical coordinates.
 cnt = 0;
 for e = 1:nel
     aa = Breaks(e);
@@ -299,19 +306,22 @@ end
 end
 
 function idx = id3(i,j,k,m,n)
-%Compute id3.
+% Map three-dimensional control indices to one vector index.
 idx = i + (j-1)*m + (k-1)*m*n;
 end
 
 function faceData = build_face_data_tensor_fast_local( ...
 m, n, l, pu, pv, pw, Ubar, Vbar, Wbar, UBreaks, VBreaks, WBreaks, ...
     a, alpha, kvals, faceNames)
+% Build all face operators by tensor products.
 faceData = cell(numel(faceNames), 1);
 
+% Build one-dimensional quadrature basis matrices.
 [uNodes, uWeights, Bu] = build_1d_face_basis_matrix_local(UBreaks, Ubar, pu, m, a);
 [vNodes, vWeights, Bv] = build_1d_face_basis_matrix_local(VBreaks, Vbar, pv, n, a);
 [wNodes, wWeights, Bw] = build_1d_face_basis_matrix_local(WBreaks, Wbar, pw, l, a);
 
+% Form Kronecker trace and derivative operators for each face.
 for iface = 1:numel(faceNames)
     fname = faceNames{iface};
     fixedParam = double(fname(2) == '+');
@@ -359,6 +369,7 @@ for iface = 1:numel(faceNames)
             error('Unknown face name.');
     end
 
+    % Store the tensor factors and plane-wave phases.
     F = struct();
     F.name = fname;
     F.type = ftype;
@@ -384,7 +395,7 @@ end
 end
 
 function [nodes, weights, B] = build_1d_face_basis_matrix_local(Breaks, Ubar, p, nCtrl, a)
-%Build 1d face basis matrix.
+% Build a one-dimensional face quadrature basis matrix.
 [gp, gw] = grule(10 * p + 5);
 nel = numel(Breaks) - 1;
 nq = numel(gp);
@@ -397,6 +408,7 @@ rows = zeros(nEntries, 1);
 cols = zeros(nEntries, 1);
 vals = zeros(nEntries, 1);
 
+% Fill the sparse basis rows span by span.
 row = 0;
 cursor = 0;
 for e = 1:nel
@@ -426,7 +438,7 @@ B = sparse(rows, cols, vals, nRows, nCtrl);
 end
 
 function [Bfix, Dfix] = build_endpoint_basis_local(Ubar, p, nCtrl, fixedParam, normalSign, a)
-%Build endpoint basis.
+% Build endpoint trace and outward-normal derivative rows.
 ders = bspbasisDers(Ubar, p, fixedParam, 1);
 if fixedParam == 0
     idx = 1:min(2, nCtrl);

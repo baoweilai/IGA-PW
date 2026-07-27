@@ -1,10 +1,11 @@
 ﻿function run_cutoff_data()
-%Generate cutoff-convergence data.
+% Generate cutoff-convergence data.
 
 clc; close all;
 
+% Set workflow paths, SCF parameters, and cache directories.
 activate_example_workflow('cutoff_convergence', ...
-    {'nurbs', 'iga', 'assembly', 'operators', 'core', 'solver'});
+    {'nurbs', 'iga', 'assembly', 'operators', 'core'});
 exampleDir = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 dataDir = fullfile(exampleDir, 'data');
 oldDir = pwd;
@@ -57,6 +58,7 @@ if ~exist(cachePwRoot, 'dir'), mkdir(cachePwRoot); end
 cacheNurbsRoot = fullfile(resultRoot, 'cache_nurbs');
 if ~exist(cacheNurbsRoot, 'dir'), mkdir(cacheNurbsRoot); end
 
+% Solve or load every retained cutoff case.
 for fixed_Refinement = fixed_Refinement_list
     for fixed_t = fixed_t_list
 
@@ -143,6 +145,7 @@ for fixed_Refinement = fixed_Refinement_list
             fprintf('time_total = %.6fs, time_eigs = %.6fs\n', meta.time_total, meta.time_eigs);
         end
 
+        % Save the cutoff summary.
         T = table(Nc_all, n_dofs, 'VariableNames', {'Nc','dof'});
 
         for k = 1:n_eigenvalues
@@ -158,7 +161,7 @@ end
 end
 
 function NcList = scan_existing_Nc(caseDir)
-%Compute existing nc.
+% Read the available cutoff values from completed case folders.
 NcList = [];
 dd = dir(fullfile(caseDir, 'Nc_*'));
 for i = 1:numel(dd)

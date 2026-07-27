@@ -1,6 +1,7 @@
 function summary = plot_penalty(optsIn)
-%Plot penalty and conditioning data.
+% Plot penalty and conditioning data.
 
+% Initialize plotting defaults and locate the result directory.
 assert(exist('optsIn', 'var') == 1, 'plot_penalty requires an options structure.');
 
 clc;
@@ -16,17 +17,14 @@ exampleDir = fileparts(fileparts(mfilename('fullpath')));
 rootDir = fullfile(exampleDir, 'data');
 cd(rootDir);
 
+% Read the penalty sweep and condition-number settings.
 Nc = get_opt(optsIn, 'Nc', 25);
 t = get_opt(optsIn, 't', 1);
 pdeg = 1 + t;
 refineList = get_opt(optsIn, 'refineList', 1:7);
-CsigmaList = get_opt(optsIn, 'CsigmaList', [10 20 30]);
+CsigmaList = get_opt(optsIn, 'CsigmaList', [10 100 1000]);
 sweepTag = sanitize_tag(get_opt(optsIn, 'sweepTag', join_numbers(CsigmaList)));
 
-savePng = get_opt(optsIn, 'save_png', true);
-savePdf = get_opt(optsIn, 'save_pdf', true);
-pngDPI = get_opt(optsIn, 'pngDPI', 600);
-plotOnly = logical(get_opt(optsIn, 'plot_only', false));
 tauShift = get_opt(optsIn, 'tau_shift', 0.9 * 4.96999274451623);
 epsDiag = get_opt(optsIn, 'eps_diag', 1e-12);
 ifaceReg = get_opt(optsIn, 'iface_reg', 1e-12);
@@ -41,6 +39,7 @@ condOpts = struct( ...
 
 baseCandidates = get_opt(optsIn, 'baseCsigmaCandidates', [20 CsigmaList(:).']);
 
+% Build summary and figure output paths.
 resultRoot = fullfile(rootDir, 'result', 'penalty');
 if ~exist(resultRoot, 'dir')
     error('Result root not found: %s', resultRoot);
@@ -61,22 +60,7 @@ if ~exist(plotDir, 'dir')
     mkdir(plotDir);
 end
 
-if plotOnly
-    if ~exist(summaryMat, 'file')
-        error('Summary file not found: %s', summaryMat);
-    end
-    plot_condition_summary(summaryMat, struct( ...
-        'outDir', plotDir, ...
-        'save_png', savePng, ...
-        'save_pdf', savePdf, ...
-        'pngDPI', pngDPI));
-    S = load(summaryMat, 'summary');
-    summary = S.summary;
-    fprintf('\n[PLOT ] redrew C_sigma condition figure from %s\n', summaryMat);
-    fprintf('[SAVED] %s\n', plotDir);
-    return;
-end
-
+% Form each shifted system and evaluate three preconditioners.
 rows = [];
 for refine = refineList(:).'
     runFile = find_saved_run(resultRoot, refine, baseCandidates);
@@ -118,6 +102,7 @@ for refine = refineList(:).'
     end
 end
 
+% Save the condition table and produce the comparison figures.
 T = struct2table(rows);
 T = sortrows(T, {'Csigma', 'refine'});
 
@@ -140,11 +125,7 @@ summary.table = T;
 
 save(summaryMat, 'summary');
 writetable(T, summaryCsv);
-plot_condition_summary(summaryMat, struct( ...
-    'outDir', plotDir, ...
-    'save_png', savePng, ...
-    'save_pdf', savePdf, ...
-    'pngDPI', pngDPI));
+plot_condition_summary(summaryMat, struct('outDir', plotDir));
 
 fprintf('\n[SAVED] %s\n', summaryMat);
 fprintf('[SAVED] %s\n', summaryCsv);
@@ -152,7 +133,7 @@ fprintf('[SAVED] %s\n', plotDir);
 end
 
 function runFile = find_saved_run(resultRoot, refine, baseCandidates)
-%Locate an index or object used by the computation.
+% Find a saved penalty run for one refinement.
 baseCandidates = unique(baseCandidates(:).', 'stable');
 for Csigma = baseCandidates
     candidate = fullfile(resultRoot, sprintf('base_%g', Csigma), ...
@@ -174,7 +155,7 @@ error('No saved run.mat found for refine=%d under %s', refine, resultRoot);
 end
 
 function [Ksigma, M, P] = reconstruct_Ksigma(run, Csigma)
-%Reconstruct cutoff-weighted penalty values.
+% Form cutoff-weighted penalty values.
 M = 0.5 * (run.M + run.M');
 P = run.P;
 Sdg = run.S;
@@ -188,7 +169,7 @@ Ksigma = 0.5 * (Ksigma + Ksigma');
 end
 
 function Pmat = build_condition_preconditioner_matrix_local(A_tau, penaltyMat, solveMode, epsD)
-%Build condition preconditioner matrix.
+% Build the selected preconditioner matrix for condition analysis.
 n = size(A_tau, 1);
 solveMode = lower(string(solveMode));
 gamma = find(sum(abs(penaltyMat), 2) ~= 0);
@@ -220,7 +201,7 @@ Pmat = 0.5 * (Pmat + Pmat');
 end
 
 function [delta, AgShifted] = make_block_positive_definite_local(Ag, epsD)
-%Build block positive definite.
+% Shift the interface block until it is positive definite.
 n = size(Ag, 1);
 if n == 0
     delta = 0;
@@ -253,7 +234,7 @@ error('PITB-DG gamma block is not numerically positive definite after delta regu
 end
 
 function kappa = shifted_generalized_abs_condition_local(A, B, maxN, label, opts)
-%Compute generalized abs condition.
+% Compute the absolute generalized condition number of the shifted system.
 n = size(A, 1);
 assert(n <= maxN, '%s: matrix size %d exceeds max_n = %g.', label, n, maxN);
 
@@ -277,7 +258,7 @@ kappa = max(absMu) / min(absMu);
 end
 
 function figs = plot_condition_summary(summaryFile, opts)
-%Plot condition summary.
+% Plot condition summary.
 S = load(summaryFile, 'summary');
 summary = S.summary;
 T = sortrows(summary.table, {'Csigma', 'refine'});
@@ -291,10 +272,6 @@ if ~exist(outDir, 'dir')
     mkdir(outDir);
 end
 
-savePng = get_opt(opts, 'save_png', true);
-savePdf = get_opt(opts, 'save_pdf', true);
-pngDPI = get_opt(opts, 'pngDPI', 600);
-
 CsigmaList = summary.CsigmaList(:).';
 labels = arrayfun(@(x) sprintf('$C_\\sigma=%g$', x), CsigmaList, 'UniformOutput', false);
 
@@ -306,14 +283,14 @@ fig = figure('Color', style.fig_color, ...
 ax = axes(fig);
 set_axes_layout(ax, style);
 plot_condition_comparison_panel(ax, Tplot, CsigmaList, labels, style);
-export_figure(fig, fullfile(outDir, 'condition'), savePng, savePdf, pngDPI);
+export_figure(fig, fullfile(outDir, 'condition'));
 figs.none_vs_interfaceblock = fig;
 
 fprintf('[PLOT ] saved C_sigma condition figure to %s\n', outDir);
 end
 
 function Tplot = filter_plot_table(T, opts)
-%Compute plot table.
+% Filter summary rows to the requested refinements.
 plotRefines = get_opt(opts, 'plot_refine_list', []);
 if isempty(plotRefines)
     plotRefines = 2:min(6, max(T.refine));
@@ -321,48 +298,9 @@ end
 Tplot = T(ismember(T.refine, plotRefines), :);
 end
 
-function plot_condition_panel(ax, Tplot, CsigmaList, labels, style, fieldName, yLabelStr)
-%Plot condition panel.
-hold(ax, 'on');
-hLines = gobjects(numel(CsigmaList), 1);
-Yall = [];
-for k = 1:numel(CsigmaList)
-    Tk = sortrows(Tplot(Tplot.Csigma == CsigmaList(k), :), 'h');
-    y = Tk.(fieldName);
-    y(y <= 0) = eps;
-    hLines(k) = plot(ax, Tk.h, y, '-', ...
-        'LineWidth', style.lw, ...
-        'Color', style.lineColors(k,:), ...
-        'Marker', style.markers{k}, ...
-        'MarkerSize', style.ms, ...
-        'MarkerFaceColor', 'w', ...
-        'MarkerEdgeColor', style.lineColors(k,:), ...
-        'DisplayName', labels{k});
-    Yall = [Yall; y(:)]; %#ok<AGROW>
-end
-
-set_axes_style(ax, style);
-set(ax, ...
-    'XScale', 'log', ...
-    'YScale', 'log', ...
-    'XMinorTick', 'off', ...
-    'YMinorTick', 'off');
-xlab = xlabel(ax, "$h$", 'Interpreter', 'latex', 'FontSize', style.label_fs);
-xlab.Units = 'normalized';
-xlab.Position(2) = style.xlabel_norm_y;
-ylabel(ax, yLabelStr, ...
-    'Interpreter', 'latex', 'FontSize', style.label_fs);
-
-apply_log_padding(ax, Tplot.h(:), Yall, style.padX, style.padYLow, style.padYHigh);
-legend(ax, hLines, labels, ...
-    'Location', style.leg_loc, ...
-    'Interpreter', style.leg_interpreter, ...
-    'FontSize', style.leg_fs, ...
-    'Box', style.leg_box);
-end
-
 function plot_condition_comparison_panel(ax, Tplot, CsigmaList, labels, style)
-%Plot condition comparison panel.
+% Plot condition comparison panel.
+% Draw unpreconditioned and TB-DG curves for every penalty value.
 hold(ax, 'on');
 hNoneLines = gobjects(numel(CsigmaList), 1);
 hIBLines = gobjects(numel(CsigmaList), 1);
@@ -399,6 +337,7 @@ for k = 1:numel(CsigmaList)
     Yall = [Yall; yNone(:); yIB(:)]; %#ok<AGROW>
 end
 
+% Apply logarithmic axes and data-dependent padding.
 set_axes_style(ax, style);
 set(ax, ...
     'XScale', 'log', ...
@@ -424,6 +363,7 @@ if numel(yExp) < 5
 end
 set(ax, 'YTick', 10 .^ yExp);
 
+% Combine both curve families in one legend.
 legendHandles = [hNoneLines; hIBLines];
 legendLabels = [legendLabelsNone; legendLabelsIB];
 leg = legend(ax, legendHandles, legendLabels, ...
@@ -436,7 +376,7 @@ leg.ItemTokenSize = style.comp_leg_token_size;
 end
 
 function set_axes_layout(ax, style)
-%Apply axes layout settings.
+% Apply axes layout settings.
 ax.Units = 'normalized';
 ax.Position = [ ...
     style.layout_left, ...
@@ -446,7 +386,7 @@ ax.Position = [ ...
 end
 
 function set_axes_style(ax, style)
-%Apply axes style settings.
+% Apply axes style settings.
 set(ax, ...
     'FontName', style.ax_fontname, ...
     'FontSize', style.ax_fontsize, ...
@@ -460,7 +400,7 @@ grid(ax, 'off');
 end
 
 function apply_log_padding(ax, x, y, padX, padYLow, padYHigh)
-%Apply log padding.
+% Apply log padding.
 x = x(isfinite(x) & x > 0);
 y = y(isfinite(y) & y > 0);
 if isempty(x) || isempty(y)
@@ -470,19 +410,14 @@ set(ax, 'XLim', [min(x) / (1 + padX), max(x) * (1 + padX)]);
 set(ax, 'YLim', [min(y) / (1 + padYLow), max(y) * (1 + padYHigh)]);
 end
 
-function export_figure(fig, baseName, savePng, savePdf, pngDPI)
-%Export figure.
+function export_figure(fig, baseName)
+% Export the figure as a PDF.
 drawnow;
-if savePdf
-    exportgraphics(fig, [baseName '.pdf'], 'ContentType', 'vector');
-end
-if savePng
-    exportgraphics(fig, [baseName '.png'], 'Resolution', pngDPI);
-end
+exportgraphics(fig, [baseName '.pdf'], 'ContentType', 'vector');
 end
 
 function style = default_style()
-%Return plotting style values.
+% Return plotting style values.
 style = struct();
 style.fig_pos   = [1 1 4.8 3.0];
 style.fig_color = 'w';
@@ -515,7 +450,7 @@ style.padX         = 0.4;
 style.padYLow      = 6000.0;
 style.padYHigh     = 2.5;
 style.comp_ylim_low = 1.0;
-style.comp_ylim_high_factor = 1e3;
+style.comp_ylim_high_factor = 1e4;
 style.comp_ytick_step = 2;
 
 style.leg_loc         = 'southwest';
@@ -530,7 +465,7 @@ style.comp_leg_token_size = [28 10];
 end
 
 function val = get_opt(s, fieldName, defaultVal)
-%Return one option value.
+% Read one option with a default value.
 if isfield(s, fieldName) && ~isempty(s.(fieldName))
     val = s.(fieldName);
 else
@@ -539,7 +474,7 @@ end
 end
 
 function out = merge_struct(base, override)
-%Merge struct.
+% Merge override fields into the base structure.
 out = base;
 if isempty(override)
     return;
@@ -551,7 +486,7 @@ end
 end
 
 function tag = sanitize_tag(tag)
-%Convert a value to a filename tag.
+% Convert a value to a filename tag.
 if isnumeric(tag)
     tag = join_numbers(tag);
 end
@@ -564,7 +499,7 @@ tag = regexprep(tag, '^_+|_+$', '');
 end
 
 function tag = join_numbers(values)
-%Format numeric values for text output.
+% Format numeric values for text output.
 parts = arrayfun(@(x) sprintf('%g', x), values(:).', 'UniformOutput', false);
 tag = strjoin(parts, '_');
 end

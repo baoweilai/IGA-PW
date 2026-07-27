@@ -1,5 +1,5 @@
 ﻿function plot_h_convergence()
-%Plot h-convergence data.
+% Plot h-convergence data.
 
 clc; close all;
 
@@ -12,12 +12,8 @@ set(groot, ...
 Example    = 'Example_3';
 Nc_fixed   = 20;
 p_list     = [1 2];
-nElem_list = [12 14 16 18 20];
-lambda_ref = 5.408325541203;
-
-save_png = true;
-save_pdf = true;
-pngDPI   = 600;
+nElem_list = [4 8 16 32 64];
+lambda_ref = 5.408249091018272;
 
 %% ---------------- unified style params ----------------
 cfg = struct();
@@ -53,10 +49,10 @@ markers = {'o','s'};
 
 slope_color  = [033 158 188] / 255;
 slope_order  = 2;
-slope_factor = 0.7;
+slope_factor = 0.7 * 10^(-1/4);
 
-xpad = 1.1;
-ypad = 1.2;
+xpad = 1.2;
+ypad = 1.6;
 
 %% ---------------- paths ----------------
 resultRoot = fullfile(pwd, 'result', Example, sprintf('Nc_%02d', Nc_fixed));
@@ -165,8 +161,8 @@ yAll = [eref(:); vertcat(data.err)];
 ax.XLim = [min(xAll)/xpad, max(xAll)*xpad];
 ax.YLim = [min(yAll)/ypad, max(max(yAll)*ypad, 1e-3)];
 
-ax.XTick = [0.02 0.05];
-ax.XTickLabel = {'$0.02$','$0.05$'};
+ax.XTick = [1e-2 1e-1];
+ax.XTickLabel = {'$10^{-2}$','$10^{-1}$'};
 
 % -------- y tick labels in exponential form --------
 emin = floor(log10(ax.YLim(1)));
@@ -184,13 +180,7 @@ lgd.Box = cfg.legend.box;
 %% ---------------- save ----------------
 baseName = 'h';
 
-if save_png
-    exportgraphics(fig, fullfile(plotDir, [baseName, '.png']), 'Resolution', pngDPI);
-    fprintf('[SAVED] %s\n', fullfile(plotDir, [baseName, '.png']));
-end
-if save_pdf
-    exportgraphics(fig, fullfile(plotDir, [baseName, '.pdf']), 'ContentType', 'vector');
-    fprintf('[SAVED] %s\n', fullfile(plotDir, [baseName, '.pdf']));
-end
+exportgraphics(fig, fullfile(plotDir, [baseName, '.pdf']), 'ContentType', 'vector');
+fprintf('[SAVED] %s\n', fullfile(plotDir, [baseName, '.pdf']));
 
 end

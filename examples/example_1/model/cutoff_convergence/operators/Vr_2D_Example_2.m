@@ -1,5 +1,5 @@
 function Vr = Vr_2D_Example_2(p,L,n_pw,x,y)
-%Evaluate the Example 2 radial potential.
+% Evaluate the Example 2 radial potential.
 
 p      = p*2*pi/L;
 

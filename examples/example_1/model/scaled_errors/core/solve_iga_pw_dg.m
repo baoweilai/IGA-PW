@@ -1,12 +1,11 @@
 ﻿function [lambda, n_dofs_total, meta] = solve_iga_pw_dg(Refinement, t, Nc, n_eigenvalues, opts)
-%Solve the Example 1 IGA-PW-DG problem.
+% Solve the Example 1 IGA-PW-DG problem.
 
 format long;
 t_total = tic;
 
 % ---------------- Parameters ----------------
 beta = opts.beta;
-DIM  = 2; %#ok<NASGU>
 
 % Example 1 geometry
 L  = 4;       % Omega = [-L/2, L/2]^2
@@ -80,7 +79,10 @@ M = sparse(n_dofs_total, n_dofs_total);
 n_gp = opts.n_gp;
 
 % Assemble NURBS block
-[H_nurbs, M_nurbs] = generate_A_M_NURBS_2D(nurbs_original, nurbs_refine, k_Vr, n_pw_Vr, L, n_gp, opts.Example);
+t_nurbs = tic;
+[H_nurbs, M_nurbs] = generate_A_M_NURBS_2D(nurbs_refine, k_Vr, L, n_gp, a);
+time_nurbs = toc(t_nurbs);
+fprintf('[IGA] volume assembly time = %.4f s\n', time_nurbs);
 H(1:n_dofs_nurbs, 1:n_dofs_nurbs) = H_nurbs;
 M(1:n_dofs_nurbs, 1:n_dofs_nurbs) = M_nurbs;
 
@@ -94,18 +96,11 @@ H(pw_dofs_indices, pw_dofs_indices) = H_pw;
 M(pw_dofs_indices, pw_dofs_indices) = M_pw;
 
 % Interface assembly (single patch)
-S = sparse(n_dofs_total, n_dofs_total);
-P = sparse(n_dofs_total, n_dofs_total);
-
-p = k_pw;
-
-[P_Bottom, S_Bottom] = IGA_DG_Bottom_Edge_Assemble(nurbs_original, nurbs_refine, p, pw_dofs_indices, L, n_dofs_total);
-[P_Top,    S_Top   ] = IGA_DG_Top_Edge_Assemble   (nurbs_original, nurbs_refine, p, pw_dofs_indices, L, n_dofs_total);
-[P_Left,   S_Left  ] = IGA_DG_Left_Edge_Assemble  (nurbs_original, nurbs_refine, p, pw_dofs_indices, L, n_dofs_total);
-[P_Right,  S_Right ] = IGA_DG_Right_Edge_Assemble (nurbs_original, nurbs_refine, p, pw_dofs_indices, L, n_dofs_total);
-
-P = P + P_Bottom + P_Top + P_Left + P_Right;
-S = S + S_Bottom + S_Top + S_Left + S_Right;
+t_dg = tic;
+[P, S] = assemble_DG_square_interface_fast( ...
+    nurbs_refine, k_pw, pw_dofs_indices, L, a, n_dofs_total);
+time_dg = toc(t_dg);
+fprintf('[DG ] interface assembly time = %.4f s\n', time_dg);
 
 % DG penalty coefficient
 sigma = beta * (1/h + Nc);
@@ -132,7 +127,12 @@ meta.beta           = beta;
 meta.sigma          = sigma;
 meta.n_dofs_nurbs   = n_dofs_nurbs;
 meta.n_pw_basis     = n_pw_basis;
+meta.inner_cheb_n   = opts.inner_cheb_n;
+meta.inner_quad_n   = opts.inner_quad_n;
+meta.pw_fft_grid_n  = opts.pw_fft_grid_n;
+meta.time_nurbs     = time_nurbs;
 meta.time_pw        = time_pw;
+meta.time_dg        = time_dg;
 
 % ---------------- PRIMME options ----------------
 ops = struct();
@@ -209,13 +209,6 @@ if isfield(opts, 'outDir') && ~isempty(opts.outDir)
     run.n_pw_basis    = n_pw_basis;
     run.meta          = meta;
 
-    if isfield(opts,'save_matrices') && opts.save_matrices
-        run.M = M;
-        if isfield(opts,'save_mat') && opts.save_mat
-            run.Mat = Mat;
-        end
-    end
-
     if isfield(opts,'save_pw_index') && opts.save_pw_index
         run.k_pw = k_pw;
     end
@@ -237,7 +230,7 @@ end
 
 
 function [k_list, n_basis] = build_pw_disk(Nc)
-%Build the plane-wave disk basis.
+% Build the plane-wave disk basis.
 N = floor(Nc);
 k_list = zeros((2*N+1)^2, 2);
 n_basis = 0;
@@ -252,14 +245,15 @@ k_list = k_list(1:n_basis,:);
 end
 
 function [H_pw, M_pw] = get_pw_matrices_cached(L, Nc, inner_domains_coordinates, k_Vr, n_pw_Vr, opts)
-%Load or assemble cached plane-wave matrices.
+% Load or assemble cached plane-wave matrices.
 cache_ok = isfield(opts,'use_pw_cache') && opts.use_pw_cache ...
     && isfield(opts,'cacheRoot') && ~isempty(opts.cacheRoot);
 
 if cache_ok
     cacheFile = fullfile(opts.cacheRoot, sprintf( ...
-        'PW_L_%g_Nc_%d_NVr_%d_fft_%d_cheb_%d.mat', ...
-        L, Nc, n_pw_Vr, opts.pw_fft_grid_n, opts.inner_cheb_n));
+        'PW_L_%g_Nc_%d_NVr_%d_fft_%d_cheb_%d_quad_%d.mat', ...
+        L, Nc, n_pw_Vr, opts.pw_fft_grid_n, opts.inner_cheb_n, ...
+        opts.inner_quad_n));
     if exist(cacheFile, 'file')
         S = load(cacheFile, 'H_pw', 'M_pw');
         H_pw = S.H_pw; M_pw = S.M_pw;
@@ -276,7 +270,7 @@ end
 end
 
 function [uh, D, rnorms, stats] = call_primme_with_prec(Mat, M, n_eigs, ops, method, Pfun)
-%Call PRIMME with the TB-DG preconditioner.
+% Call PRIMME with the TB-DG preconditioner.
 assert(~isempty(Pfun), 'call_primme_with_prec requires Pfun.');
 if ~isempty(method)
     [uh, D, rnorms, stats] = primme_eigs(Mat, M, n_eigs, 'SA', ops, method, Pfun);
@@ -286,7 +280,7 @@ end
 end
 
 function Pfun = build_interface_block_preconditioner(Ktau, P, eps_diag, iface_reg)
-%Build the TB-DG interface-block preconditioner.
+% Build the TB-DG interface-block preconditioner.
 d = abs(diag(Ktau));
 d(d < eps_diag) = 1;
 gamma = find(sum(abs(P), 2) ~= 0);
@@ -298,13 +292,13 @@ Pfun = @(X) apply_interface_block_preconditioner(X, dinv, gamma, Dg);
 end
 
 function Z = apply_interface_block_preconditioner(X, dinv, gamma, Dg)
-%Apply the TB-DG interface-block preconditioner.
+% Apply the TB-DG interface-block preconditioner.
 Z = bsxfun(@times, X, dinv);
 Z(gamma, :) = Dg \ X(gamma, :);
 end
 
 function s = string_or_empty(x)
-%Convert a text value to a string.
+% Convert a text value to a string.
 if isempty(x)
     s = '';
 else

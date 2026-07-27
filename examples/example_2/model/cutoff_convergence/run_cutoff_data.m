@@ -1,11 +1,12 @@
 function run_cutoff_data()
-%Generate Example 2 cutoff-convergence data.
+% Generate Example 2 cutoff-convergence data.
 
 clc; close all;
 
+% Set workflow paths, parameters, and cache directories.
 activate_example_workflow('cutoff_convergence', ...
     {'nurbs', 'iga', 'assembly', ...
-    'operators', 'error_norms', 'core', 'solver'});
+    'operators', 'error_norms', 'core'});
 exampleDir = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 rootDir = fullfile(exampleDir, 'data');
 oldDir = pwd;
@@ -40,6 +41,7 @@ if ~exist(cacheRootPW, 'dir'), mkdir(cacheRootPW); end
 cacheRootRef = fullfile(resultRoot, 'cache_refine');
 if ~exist(cacheRootRef, 'dir'), mkdir(cacheRootRef); end
 
+% Solve each polynomial degree, refinement, and cutoff case.
 for t = t_list
     pdeg = 1 + t;
     refList = sort(unique(Refinement_list(:)));
@@ -89,8 +91,6 @@ for t = t_list
                 opts.save_eigenvectors  = true;
                 opts.save_nurbs         = true;
                 opts.save_pw_index      = true;
-                opts.save_matrices      = false;
-                opts.save_mat           = false;
 
                 fprintf('\n------------------------------------------------------------\n');
                 fprintf('[RUN ] Nc=%d, p=%d, refine=%d\n', Nc, pdeg, refine);
@@ -103,6 +103,7 @@ for t = t_list
             n_dofs(ii)      = run.n_dofs_total;
         end
 
+        % Save the cutoff summary for this refinement.
         T = table(Nc_list(:), n_dofs, 'VariableNames', {'Nc','dof'});
         for k = 1:n_eigenvalues
             T.(sprintf('lambda%d', k)) = Lambda_Nc(:, k);
@@ -116,7 +117,7 @@ end
 end
 
 function run = load_run(runMat, n_eigs)
-%Read one completed cutoff case.
+% Read one completed cutoff case.
 
 S = load(runMat, 'run');
 assert(isfield(S, 'run'), 'Missing run structure in %s.', runMat);

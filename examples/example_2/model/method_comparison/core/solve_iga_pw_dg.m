@@ -1,5 +1,5 @@
 function [lambda, n_dofs_total, meta] = solve_iga_pw_dg(Refinement, t, Nc, n_eigenvalues, opts)
-%Solve the Example 2 IGA-PW-DG problem.
+% Solve the Example 2 IGA-PW-DG problem.
 
 format long;
 t_total = tic;
@@ -7,7 +7,6 @@ solve_mode = "interfaceblock";
 
 % ---------------- Parameters ----------------
 beta = opts.beta;
-DIM  = 2; %#ok<NASGU>
 
 % Example 2 geometry
 L = 4;
@@ -234,13 +233,6 @@ if isfield(opts, 'outDir') && ~isempty(opts.outDir)
     run.n_pw_basis    = n_pw_basis;
     run.meta          = meta;
 
-    if isfield(opts,'save_matrices') && opts.save_matrices
-        run.M = M;
-        if isfield(opts,'save_mat') && opts.save_mat
-            run.Mat = Mat;
-        end
-    end
-
     if isfield(opts,'save_pw_index') && opts.save_pw_index
         run.k_pw = k_pw;
     end
@@ -264,7 +256,7 @@ end
 
 
 function nurbs_original = make_rect_patch(rect)
-%Build rect patch.
+% Build an affine rectangular NURBS patch.
 x1 = rect(1); x2 = rect(2);
 y1 = rect(3); y2 = rect(4);
 
@@ -280,7 +272,7 @@ nurbs_original.weights = [1 1; 1 1];
 end
 
 function [k_list, n_basis] = build_pw_disk(Nc)
-%Build the plane-wave disk basis.
+% Build the plane-wave disk basis.
 N = floor(Nc);
 k_list = zeros((2*N+1)^2, 2);
 n_basis = 0;
@@ -295,7 +287,7 @@ k_list = k_list(1:n_basis,:);
 end
 
 function [H_pw, M_pw] = get_pw_matrices_cached_example2(L, Nc, inner_domains_coordinates, k_Vr, n_pw_Vr, opts)
-%Return PW matrices cached example2.
+% Load or assemble the Example 2 plane-wave matrices.
 cache_ok = isfield(opts,'use_pw_cache') && opts.use_pw_cache ...
     && isfield(opts,'cacheRoot') && ~isempty(opts.cacheRoot);
 
@@ -319,7 +311,7 @@ end
 end
 
 function [H_blk, M_blk] = get_nurbs_block_cached_example2(tag, nurbs_original, nurbs_refine, k_Vr, n_pw_Vr, L, n_gp, opts)
-%Return NURBS block cached example2.
+% Load or assemble one Example 2 NURBS block.
 cache_ok = isfield(opts, 'cacheNurbsRoot') && ~isempty(opts.cacheNurbsRoot);
 
 if cache_ok
@@ -345,7 +337,7 @@ end
 
 function [P_edge, S_edge] = get_interface_edge_cached_example2(tag, edgefun, ...
 nurbs_original, nurbs_refine, p, pw_dofs_indices, L, n_dofs, offset, Nc, opts)
-%Load or assemble one cached interface edge.
+% Load or assemble one cached interface edge.
 
 cache_ok = isfield(opts, 'cacheInterfaceRoot') && ~isempty(opts.cacheInterfaceRoot);
 
@@ -377,7 +369,7 @@ end
 end
 
 function [uh, D, rnorms, stats] = call_primme_with_prec(Mat, M, n_eigs, targetMode, ops, method, Pfun)
-%Call PRIMME with prec.
+% Solve with PRIMME using the supplied preconditioner.
 assert(~isempty(Pfun), 'call_primme_with_prec requires Pfun.');
 
 if strcmpi(targetMode, 'SA')
@@ -392,7 +384,7 @@ end
 end
 
 function Pfun = build_interface_block_preconditioner_local(Ktau, P, opts)
-%Build the TB-DG interface-block preconditioner.
+% Build the TB-DG interface-block preconditioner.
 eps_diag = get_opt_local(opts, 'eps_diag', 1e-12);
 iface_reg = get_opt_local(opts, 'iface_reg', 1e-12);
 d = abs(diag(Ktau));
@@ -406,13 +398,13 @@ Pfun = @(X) apply_interface_block_prec_local(X, dinv, gamma, Dg);
 end
 
 function Z = apply_interface_block_prec_local(X, dinv, gamma, Dg)
-%Apply the interface-block preconditioner.
+% Apply the interface-block preconditioner.
 Z = bsxfun(@times, X, dinv);
 Z(gamma, :) = Dg \ X(gamma, :);
 end
 
 function s = string_or_empty(x)
-%Convert a text value to a string.
+% Convert a text value to a string.
 if isempty(x)
     s = '';
 else
@@ -421,7 +413,7 @@ end
 end
 
 function value = get_opt_local(opts, name, default)
-%Return one option value.
+% Read one option with a default value.
 if isstruct(opts) && isfield(opts, name) && ~isempty(opts.(name))
     value = opts.(name);
 else
@@ -429,14 +421,12 @@ else
 end
 end
 
-% Offset versions of your 4 edge assembly functions
-% Only difference from original: edge_dofs_plus = local_edge_dofs + offset
+% Assemble the four translated IGA-PW boundary interfaces.
 
 function [P,S] = IGA_DG_Bottom_Edge_Assemble_offset(nurbs_original, nurbs_refine, pw_index, plane_wave_dofs_index, L, n_dofs, offset)
-%Assemble matrices or interface terms for the method.
+% Assemble the bottom-edge jump and average operators.
 
-DIM = 2; %#ok<NASGU>
-
+% Read the geometry and refined-basis data.
 ConPts_o   = nurbs_original.ConPts;
 weights_o  = nurbs_original.weights;
 knotU_o    = nurbs_original.knotU;
@@ -456,6 +446,7 @@ UBreaks          = nurbs_refine.UBreaks;
 uNoEs            = length(UBreaks) - 1;
 bottom_edge_dofs = nurbs_refine.bottom_edge_dofs;
 
+% Prepare bottom-edge segments, quadrature, and plane-wave traces.
 bottom_edge_node = zeros(uNoEs,2);
 for i=1:uNoEs
     bottom_edge_node(i,:) = [UBreaks(i),UBreaks(i+1)];
@@ -467,9 +458,6 @@ n_gp = length(gp);
 v_bottom_inner = 0;
 
 edge_dofs_minus  = plane_wave_dofs_index;
-n_pw_basis       = size(pw_index,1);
-basis_grad_minus = zeros(n_pw_basis,2);
-basis_minus      = zeros(n_pw_basis,1);
 Omega_area       = L*L;
 pw_grad_scale    = 1i * 2*pi / L;
 pw_val_scale     = 1 / sqrt(Omega_area);
@@ -524,10 +512,9 @@ end
 end
 
 function [P,S] = IGA_DG_Top_Edge_Assemble_offset(nurbs_original, nurbs_refine, pw_index, plane_wave_dofs_index, L, n_dofs, offset)
-%Assemble matrices or interface terms for the method.
+% Assemble the top-edge jump and average operators.
 
-DIM = 2; %#ok<NASGU>
-
+% Read the geometry and refined-basis data.
 ConPts_o   = nurbs_original.ConPts;
 weights_o  = nurbs_original.weights;
 knotU_o    = nurbs_original.knotU;
@@ -547,6 +534,7 @@ UBreaks        = nurbs_refine.UBreaks;
 uNoEs          = length(UBreaks) - 1;
 top_edge_dofs  = nurbs_refine.top_edge_dofs;
 
+% Prepare top-edge segments, quadrature, and plane-wave traces.
 top_edge_node = zeros(uNoEs,2);
 for i=1:uNoEs
     top_edge_node(i,:) = [UBreaks(i),UBreaks(i+1)];
@@ -558,9 +546,6 @@ n_gp = length(gp);
 v_top_inner = 1;
 
 edge_dofs_minus  = plane_wave_dofs_index;
-n_pw_basis       = size(pw_index,1);
-basis_grad_minus = zeros(n_pw_basis,2);
-basis_minus      = zeros(n_pw_basis,1);
 Omega_area       = L*L;
 pw_grad_scale    = 1i * 2*pi / L;
 pw_val_scale     = 1 / sqrt(Omega_area);
@@ -615,10 +600,9 @@ end
 end
 
 function [P,S] = IGA_DG_Left_Edge_Assemble_offset(nurbs_original, nurbs_refine, pw_index, plane_wave_dofs_index, L, n_dofs, offset)
-%Assemble matrices or interface terms for the method.
+% Assemble the left-edge jump and average operators.
 
-DIM = 2; %#ok<NASGU>
-
+% Read the geometry and refined-basis data.
 ConPts_o   = nurbs_original.ConPts;
 weights_o  = nurbs_original.weights;
 knotU_o    = nurbs_original.knotU;
@@ -638,6 +622,7 @@ VBreaks         = nurbs_refine.VBreaks;
 vNoEs           = length(VBreaks) - 1;
 left_edge_dofs  = nurbs_refine.left_edge_dofs;
 
+% Prepare left-edge segments, quadrature, and plane-wave traces.
 left_edge_node = zeros(vNoEs,2);
 for i=1:vNoEs
     left_edge_node(i,:) = [VBreaks(i),VBreaks(i+1)];
@@ -649,9 +634,6 @@ n_gp = length(gp);
 u_left_inner = 0;
 
 edge_dofs_minus  = plane_wave_dofs_index;
-n_pw_basis       = size(pw_index,1);
-basis_grad_minus = zeros(n_pw_basis,2);
-basis_minus      = zeros(n_pw_basis,1);
 Omega_area       = L*L;
 pw_grad_scale    = 1i * 2*pi / L;
 pw_val_scale     = 1 / sqrt(Omega_area);
@@ -706,10 +688,9 @@ end
 end
 
 function [P,S] = IGA_DG_Right_Edge_Assemble_offset(nurbs_original, nurbs_refine, pw_index, plane_wave_dofs_index, L, n_dofs, offset)
-%Assemble matrices or interface terms for the method.
+% Assemble the right-edge jump and average operators.
 
-DIM = 2; %#ok<NASGU>
-
+% Read the geometry and refined-basis data.
 ConPts_o   = nurbs_original.ConPts;
 weights_o  = nurbs_original.weights;
 knotU_o    = nurbs_original.knotU;
@@ -729,6 +710,7 @@ VBreaks          = nurbs_refine.VBreaks;
 vNoEs            = length(VBreaks) - 1;
 right_edge_dofs  = nurbs_refine.right_edge_dofs;
 
+% Prepare right-edge segments, quadrature, and plane-wave traces.
 right_edge_node = zeros(vNoEs,2);
 for i=1:vNoEs
     right_edge_node(i,:) = [VBreaks(i),VBreaks(i+1)];
@@ -740,9 +722,6 @@ n_gp = length(gp);
 u_right_inner = 1;
 
 edge_dofs_minus  = plane_wave_dofs_index;
-n_pw_basis       = size(pw_index,1);
-basis_grad_minus = zeros(n_pw_basis,2);
-basis_minus      = zeros(n_pw_basis,1);
 Omega_area       = L*L;
 pw_grad_scale    = 1i * 2*pi / L;
 pw_val_scale     = 1 / sqrt(Omega_area);

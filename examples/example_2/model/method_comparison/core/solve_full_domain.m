@@ -1,6 +1,7 @@
 ﻿function [result, meta] = solve_full_domain(mode, cfg, opts)
-%Compute fulldomain singlemethod.
+% Solve one full-domain IGA or plane-wave problem.
 
+% Read the method and eigensolver settings.
 format long;
 t_total = tic;
 
@@ -16,6 +17,7 @@ ops.maxit = get_opt_local(opts, 'primme_maxit', 2e8);
 ops.reportLevel = get_opt_local(opts, 'primme_reportLevel', 0);
 primme_method = get_opt_local(opts, 'primme_method', 'DEFAULT_MIN_TIME');
 
+% Assemble the selected full-domain matrix pair.
 switch mode
     case "pw"
         [Mat, M, static_meta] = build_pw_problem_local(cfg, opts, L);
@@ -45,6 +47,7 @@ if mode == "pw"
     uh = fix_global_phase_pw_local(uh, static_meta.k_pw);
 end
 
+% Package the normalized eigenpairs and solver data.
 meta = static_meta;
 meta.mode = char(mode);
 meta.solve_mode = char(solve_mode);
@@ -58,6 +61,7 @@ result.uh = uh;
 result.n_dofs_total = size(Mat, 1);
 result.n_dofs_eval = size(uh, 1);
 
+% Save the retained full-domain result.
 if isfield(opts, 'outDir') && ~isempty(opts.outDir)
     if ~exist(opts.outDir, 'dir'), mkdir(opts.outDir); end
     run = struct();
@@ -81,7 +85,7 @@ end
 end
 
 function [Mat, M, meta] = build_pw_problem_local(cfg, opts, L)
-%Build PW problem.
+% Assemble the full-domain plane-wave eigenproblem.
 Nc = cfg.Nc;
 N_Vr = get_opt_local(opts, 'potential_Nc_pw', 2);
 sample_m = get_opt_local(opts, 'pw_potential_grid_m', 2048);
@@ -101,7 +105,8 @@ meta.periodic_bc = true;
 end
 
 function [Mat, M, meta] = build_iga_problem_local(cfg, opts, L, Example)
-%Build IGA problem.
+% Build the full-domain IGA matrix pair.
+% Construct the elevated and refined rectangular patch.
 pdeg = cfg.pdeg;
 refine = cfg.refine;
 t = pdeg - 1;
@@ -133,6 +138,7 @@ else
     cacheFile = '';
 end
 
+% Load or assemble the NURBS matrices.
 if cache_ok && exist(cacheFile, 'file')
     S = load(cacheFile, 'Mat', 'M');
     Mat = S.Mat;
@@ -148,11 +154,9 @@ end
 Mat = 0.5 * (Mat + Mat');
 M = 0.5 * (M + M');
 
-use_periodic_bc = get_opt_local(opts, 'periodic_bc_iga', false);
-full_to_reduced = [];
-if use_periodic_bc
-    [Mat, M, full_to_reduced] = apply_periodic_reduction_local(Mat, M, nurbs_refine);
-end
+% Apply periodic identification and package the mesh data.
+[Mat, M, full_to_reduced] = ...
+    apply_periodic_reduction_local(Mat, M, nurbs_refine);
 
 meta = struct();
 meta.pdeg = pdeg;
@@ -160,16 +164,14 @@ meta.refine = refine;
 meta.h = L / (2^refine);
 meta.L = L;
 meta.nurbs_refine = nurbs_refine;
-meta.periodic_bc = use_periodic_bc;
+meta.periodic_bc = true;
 meta.n_dofs_full = nurbs_refine.n_dofs_domains;
 meta.n_dofs_reduced = size(Mat, 1);
-if use_periodic_bc
-    meta.full_to_reduced = full_to_reduced;
-end
+meta.full_to_reduced = full_to_reduced;
 end
 
 function [Mat, M, k_pw] = get_full_pw_matrices_cached_local(L, Nc, p_Vr, n_pw_Vr, sample_m, opts)
-%Return full PW matrices cached.
+% Load or assemble cached full-domain plane-wave matrices.
 cache_ok = get_opt_local(opts, 'use_pw_cache', true) ...
     && isfield(opts, 'cacheRoot') && ~isempty(opts.cacheRoot);
 
@@ -200,7 +202,7 @@ for ii = 1:n_basis
         end
         dk_idx = mod(dk, sample_m) + 1;
         % meshgrid stores x along columns and y along rows, so the FFT
-        % coefficient lookup must use (y-index, x-index).
+        % The coefficient lookup uses (y-index, x-index).
         Vcoef = Vfft(dk_idx(2), dk_idx(1)) ...
             * exp(1i * pi * dk(1) * (1 / sample_m + 1)) ...
             * exp(1i * pi * dk(2) * (1 / sample_m + 1));
@@ -216,7 +218,7 @@ end
 end
 
 function Vfft = sample_full_potential_fft_local(L, p_Vr, sample_m)
-%Sample full potential FFT.
+% Sample full potential FFT.
 dx = L / sample_m;
 x = -L / 2 + dx / 2 : dx : L / 2 - dx / 2;
 [X, Y] = meshgrid(x, x);
@@ -226,7 +228,7 @@ Vfft = ifftn(V);
 end
 
 function Vr = example2_potential_grid_local(p, L, X, Y)
-%Compute potential grid.
+% Compute potential grid.
 alpha = 5;
 p = p * 2 * pi / L;
 
@@ -254,7 +256,7 @@ Vr = real(Vr1 + Vr2);
 end
 
 function [uh, D, rnorms, stats] = solve_generalized_eigs_local(Mat, M, solve_mode, n_eigs, ops, method, opts)
-%Solve generalized eigs.
+% Solve the selected generalized eigenproblem.
 Pfun = build_selected_preconditioner_local(Mat, solve_mode, opts);
 if isempty(Pfun)
     [uh, D, rnorms, stats] = call_primme_noprec_local(Mat, M, n_eigs, ops, method);
@@ -264,7 +266,7 @@ end
 end
 
 function uh = fix_global_phase_pw_local(uh, k_pw)
-%Fix global phase PW.
+% Fix the global phase using the zero plane-wave coefficient.
 for i = 1:size(uh, 2)
     [~, idx] = max(abs(uh(:, i)));
     k0 = k_pw(idx, :);
@@ -286,7 +288,7 @@ end
 end
 
 function nurbs_original = make_rect_patch_local(rect)
-%Build rect patch.
+% Build an affine rectangular NURBS patch.
 x1 = rect(1); x2 = rect(2);
 y1 = rect(3); y2 = rect(4);
 
@@ -300,7 +302,7 @@ nurbs_original.weights = [1 1; 1 1];
 end
 
 function [k_list, n_basis] = build_pw_disk_local(Nc)
-%Build PW disk.
+% Build the circular plane-wave index set.
 N = floor(Nc);
 k_list = zeros((2 * N + 1)^2, 2);
 n_basis = 0;
@@ -315,7 +317,7 @@ k_list = k_list(1:n_basis, :);
 end
 
 function [MatRed, MRed, full_to_reduced] = apply_periodic_reduction_local(MatFull, MFull, nurbs_refine)
-%Apply periodic reduction.
+% Apply periodic reduction.
 full_to_reduced = build_periodic_trace_map_local(nurbs_refine.m, nurbs_refine.n);
 nFull = numel(full_to_reduced);
 nRed = max(full_to_reduced);
@@ -327,7 +329,7 @@ MRed = 0.5 * (MRed + MRed');
 end
 
 function full_to_reduced = build_periodic_trace_map_local(m, n)
-%Build periodic trace map.
+% Build periodic trace map.
 rep = reshape(1:(m * n), m, n);
 rep(m, :) = rep(1, :);
 rep(:, n) = rep(:, 1);
@@ -336,12 +338,12 @@ full_to_reduced = double(full_to_reduced(:));
 end
 
 function uh_full = expand_periodic_coeff_local(uh_red, full_to_reduced)
-%Compute periodic coeff.
+% Expand reduced periodic coefficients to the full basis.
 uh_full = uh_red(full_to_reduced, :);
 end
 
 function [uh, D, rnorms, stats] = call_primme_noprec_local(Mat, M, n_eigs, ops, method)
-%Call PRIMME noprec.
+% Solve the generalized eigenproblem with PRIMME without preconditioning.
 if ~isempty(method)
     [uh, D, rnorms, stats] = primme_eigs(Mat, M, n_eigs, 'SA', ops, method);
 else
@@ -350,7 +352,7 @@ end
 end
 
 function [uh, D, rnorms, stats] = call_primme_with_prec_local(Mat, M, n_eigs, ops, method, Pfun)
-%Call PRIMME with prec.
+% Solve with PRIMME using the supplied preconditioner.
 if ~isempty(method)
     [uh, D, rnorms, stats] = primme_eigs(Mat, M, n_eigs, 'SA', ops, method, Pfun);
 else
@@ -359,7 +361,7 @@ end
 end
 
 function Pfun = build_selected_preconditioner_local(Ktau, solve_mode, opts)
-%Build selected preconditioner.
+% Build selected preconditioner.
 solve_mode = lower(string(solve_mode));
 switch solve_mode
     case "none"
@@ -376,7 +378,7 @@ end
 end
 
 function label = solve_mode_to_label_local(solve_mode)
-%Solve mode to label.
+% Convert the solver-mode identifier to a display label.
 switch lower(string(solve_mode))
     case "none"
         label = 'None';
@@ -388,7 +390,7 @@ end
 end
 
 function value = get_opt_local(opts, name, default)
-%Return one option value.
+% Read one option with a default value.
 if isfield(opts, name) && ~isempty(opts.(name))
     value = opts.(name);
 else

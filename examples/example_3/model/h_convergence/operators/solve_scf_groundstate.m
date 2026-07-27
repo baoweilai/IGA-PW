@@ -1,6 +1,6 @@
 function [lambda1_final, u1_final, info] = solve_scf_groundstate( ...
     Mat0, M, P, n_dofs_nurbs, pw_dofs_indices, ...
-    nurbs_original, nurbs_refine, k_pw, L, a, ~, n_gp, ...
+    nurbs_base, nurbs_refine, k_pw, L, a, ~, n_gp, ...
     targetShift, ops, primme_method, opts)
 
 % Solve the SCF ground-state problem.
@@ -28,6 +28,7 @@ info.time_build_prec_total    = 0;
 
 lambda_hist = zeros(scf_maxit, 1);
 
+% Solve the initial linearized ground-state problem.
 n_track_init = min(track_n_eigs, size(Mat0,1) - 1);
 if n_track_init < 1
     n_track_init = 1;
@@ -36,17 +37,18 @@ end
 [U0, D0, ~, ~, solveInfo0, ~] = solve_generalized_eigs_with_interface_block( ...
     Mat0, M, P, n_track_init, targetShift, ops, primme_method, opts, n_dofs_nurbs, k_pw);
 
-u_old = U0(:,1);
-u_old = normalize_in_M(u_old, M);
-lambda_old = real(D0(1,1));
+uPrev = U0(:,1);
+uPrev = normalize_in_M(uPrev, M);
+lambdaPrev = real(D0(1,1));
 
 info.time_eigs_total       = info.time_eigs_total + solveInfo0.time_eigs;
 info.time_build_prec_total = info.time_build_prec_total + solveInfo0.time_build_prec;
 
+% Update the nonlinear operator, eigenpair, and mixed state.
 for it = 1:scf_maxit
     [Nmat, ~] = build_nonlinear_operator( ...
-        u_old, n_dofs_nurbs, pw_dofs_indices, ...
-        nurbs_original, nurbs_refine, n_gp, ...
+        uPrev, n_dofs_nurbs, pw_dofs_indices, ...
+        nurbs_base, nurbs_refine, n_gp, ...
         k_pw, L, a, m_pw);
 
     Mat_cur = Mat0 + Nmat;
@@ -60,32 +62,35 @@ for it = 1:scf_maxit
     [Ucand, Dcand, ~, ~, solveInfo1, ~] = solve_generalized_eigs_with_interface_block( ...
         Mat_cur, M, P, n_track, targetShift, ops, primme_method, opts, n_dofs_nurbs, k_pw);
 
-    [u_raw, lambda_new, branch_id] = select_branch_by_overlap(Ucand, Dcand, u_old, M);
+    [u_raw, lambdaCand, branch_id] = select_branch_by_overlap(Ucand, Dcand, uPrev, M);
 
-    u_raw = align_phase_to_previous(u_raw, u_old, M);
+    u_raw = align_phase(u_raw, uPrev, M);
     u_raw = normalize_in_M(u_raw, M);
 
     if scf_mixing >= 1
         u_mix = u_raw;
     elseif scf_mixing <= 0
-        u_mix = u_old;
+        u_mix = uPrev;
     else
-        u_mix = scf_mixing * u_raw + (1 - scf_mixing) * u_old;
+        u_mix = scf_mixing * u_raw + (1 - scf_mixing) * uPrev;
     end
 
-    u_mix = align_phase_to_previous(u_mix, u_old, M);
+    u_mix = align_phase(u_mix, uPrev, M);
     u_mix = normalize_in_M(u_mix, M);
 
-    abslambda = abs(lambda_new - lambda_old);
+    abslambda = abs(lambdaCand - lambdaPrev);
 
     info.time_eigs_total       = info.time_eigs_total + solveInfo1.time_eigs;
     info.time_build_prec_total = info.time_build_prec_total + solveInfo1.time_build_prec;
 
-    lambda_hist(it) = lambda_new;
+    lambda_hist(it) = lambdaCand;
 
     info.n_iters        = it;
     info.abslambda      = abslambda;
     info.last_branch_id = branch_id;
+
+    fprintf('[SCF-GS] lambda1 = %.12f, iters = %d, abslambda = %.3e\n', ...
+        lambdaCand, it, abslambda);
 
     if it >= 3
         if abs(lambda_hist(it) - lambda_hist(it-2)) < 5e-5 && ...
@@ -94,8 +99,8 @@ for it = 1:scf_maxit
         end
     end
 
-    u_old = u_mix;
-    lambda_old = lambda_new;
+    uPrev = u_mix;
+    lambdaPrev = lambdaCand;
 
     if abslambda < scf_tol_lambda
         info.converged = true;
@@ -103,9 +108,10 @@ for it = 1:scf_maxit
     end
 end
 
+% Assemble the nonlinear operator and solve the final eigenpair.
 [Nmat_final, ~] = build_nonlinear_operator( ...
-    u_old, n_dofs_nurbs, pw_dofs_indices, ...
-    nurbs_original, nurbs_refine, n_gp, ...
+    uPrev, n_dofs_nurbs, pw_dofs_indices, ...
+    nurbs_base, nurbs_refine, n_gp, ...
     k_pw, L, a, m_pw);
 
 Mat_final = Mat0 + Nmat_final;
@@ -119,8 +125,8 @@ end
 [Uf, Df, ~, ~, solveInfof, ~] = solve_generalized_eigs_with_interface_block( ...
     Mat_final, M, P, n_track_final, targetShift, ops, primme_method, opts, n_dofs_nurbs, k_pw);
 
-[u1_final, lambda1_final, branch_id_final] = select_branch_by_overlap(Uf, Df, u_old, M);
-u1_final = align_phase_to_previous(u1_final, u_old, M);
+[u1_final, lambda1_final, branch_id_final] = select_branch_by_overlap(Uf, Df, uPrev, M);
+u1_final = align_phase(u1_final, uPrev, M);
 u1_final = normalize_in_M(u1_final, M);
 
 info.time_eigs_total       = info.time_eigs_total + solveInfof.time_eigs;
@@ -133,7 +139,7 @@ info.last_branch_id = branch_id_final;
 end
 
 function [u_sel, lambda_sel, idx_sel] = select_branch_by_overlap(Ucand, Dcand, u_prev, M)
-%Select the eigenvector branch by overlap.
+% Select the eigenvector branch by overlap.
 lams = real(diag(Dcand));
 nCand = size(Ucand, 2);
 overlaps = zeros(nCand, 1);
@@ -175,7 +181,7 @@ end
 end
 
 function Pfun = build_interface_block_preconditioner(Ktau, P, eps_diag, iface_reg)
-%Build the TB-DG interface-block preconditioner.
+% Build the TB-DG interface-block preconditioner.
 d = abs(diag(Ktau));
 d(d < eps_diag) = 1;
 gamma = find(sum(abs(P), 2) ~= 0);
@@ -187,24 +193,24 @@ Pfun = @(X) apply_interface_block_preconditioner(X, dinv, gamma, Dg);
 end
 
 function Z = apply_interface_block_preconditioner(X, dinv, gamma, Dg)
-%Apply the TB-DG interface-block preconditioner.
+% Apply the TB-DG interface-block preconditioner.
 Z = bsxfun(@times, X, dinv);
 Z(gamma, :) = Dg \ X(gamma, :);
 end
 
 function [uh, D, rnorms, stats] = call_primme_local(Mat, M, n_eigs, targetShift, ops, primme_method, Pfun)
-%Call PRIMME for the local eigenproblem.
+% Call PRIMME for the local eigenproblem.
 [uh, D, rnorms, stats] = primme_eigs(Mat, M, n_eigs, targetShift, ops, primme_method, Pfun);
 end
 
 function u = normalize_in_M(u, M)
-%Normalize an eigenvector in the mass inner product.
+% Normalize an eigenvector in the mass inner product.
 nu = real(u' * M * u);
 u = u / sqrt(abs(nu));
 end
 
 function u = fix_global_phase_single_pw(u, n_dofs_nurbs, k_pw)
-%Fix the global phase using one plane-wave coefficient.
+% Fix the global phase using one plane-wave coefficient.
 u_pw = u(n_dofs_nurbs+1:end);
 [~, idx] = max(abs(u_pw));
 k0 = k_pw(idx, :);
@@ -227,10 +233,10 @@ else
 end
 end
 
-function u_new = align_phase_to_previous(u_new, u_old, M)
-%Align the eigenvector phase to the previous iterate.
-alpha = u_old' * M * u_new;
+function uAligned = align_phase(uAligned, uTarget, M)
+% Align an eigenvector phase to a reference iterate.
+alpha = uTarget' * M * uAligned;
 if abs(alpha) > 0
-    u_new = exp(-1i * angle(alpha)) * u_new;
+    uAligned = exp(-1i * angle(alpha)) * uAligned;
 end
 end

@@ -1,5 +1,5 @@
 function i=findspan(U,p,u)
-%Locate an index or object used by the computation.
+% Find the active knot span for a parameter value.
 
 m=length(U);
 n=m-p-1;
@@ -25,6 +25,3 @@ while  u<U(mid) || u>=U(mid+1)
 end
 i=mid;
 end
-
-%==========================================Test============================
-% the output is  ==== i=5;

@@ -1,10 +1,9 @@
 function [ids, R, dRdx] = NURBS2D_Eval_Param(refine, x, y)
-%Evaluate a 2-D NURBS parameter map.
+% Evaluate a 2-D NURBS parameter map.
 
 U  = refine.Ubar;    V  = refine.Vbar;
 p  = refine.pu;      q  = refine.pv;
 m  = length(U) - p - 1;
-n  = length(V) - q - 1;
 
 xmin = refine.bbox(1,1); xmax = refine.bbox(1,2);
 ymin = refine.bbox(2,1); ymax = refine.bbox(2,2);

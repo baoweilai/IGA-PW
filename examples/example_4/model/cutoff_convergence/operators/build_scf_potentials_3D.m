@@ -1,4 +1,4 @@
-﻿function [rhoGrid, VHGrid, VxcGrid, epsxcGrid, aux] = build_scf_potentials_3D( ...
+﻿function [rhoGrid, VHGrid, aux] = build_scf_potentials_3D( ...
 uh, nI, nurbs_refine, pwData, gridCache, opts)
 % Build SCF densities and potentials on the Cartesian midpoint grid.
 arguments
@@ -10,7 +10,6 @@ gridCache
 opts struct
 end
 
-use_exchange_correlation = opts.use_exchange_correlation;
 rho_override = opts.rhoGrid;
 skip_poisson = opts.skip_poisson;
 iga_grid_eval_matrix = opts.iga_grid_eval_matrix;
@@ -44,23 +43,14 @@ else
     VHGrid = solve_poisson_fft_zero_mode(rhoGrid, gridCache);
 end
 
-if use_exchange_correlation
-    [VxcGrid, epsxcGrid] = vxc_pz81_unpolarized(rhoGrid);
-else
-    VxcGrid = zeros(size(rhoGrid));
-    epsxcGrid = zeros(size(rhoGrid));
-end
-
 vol = gridCache.dx ^ 3;
 aux.int_rho_vh = real(sum(rhoGrid(:) .* VHGrid(:))) * vol;
-aux.int_rho_vxc = real(sum(rhoGrid(:) .* VxcGrid(:))) * vol;
-aux.Exc = real(sum(rhoGrid(:) .* epsxcGrid(:))) * vol;
 aux.total_charge = real(sum(rhoGrid(:))) * vol;
 aux.uGrid = uGrid;
 end
 
 function u = eval_pw_on_grid(cP, pwData, m)
-%Evaluate PW on grid.
+% Evaluate the plane-wave expansion on the Cartesian grid.
 L = pwData.L;
 Omega = L ^ 3;
 k_pw = pwData.k_pw;
@@ -78,7 +68,7 @@ u = ifftn(raw) * (m ^ 3);
 end
 
 function val = eval_iga_on_points(nurbs_refine, coeff, X, Y, Z, a)
-%Evaluate IGA on points.
+% Evaluate the IGA expansion at Cartesian points.
 U = nurbs_refine.Ubar; V = nurbs_refine.Vbar; W = nurbs_refine.Wbar;
 pu = nurbs_refine.pu; pv = nurbs_refine.pv; pw = nurbs_refine.pw;
 m = nurbs_refine.m; n = nurbs_refine.n;
@@ -117,7 +107,7 @@ end
 end
 
 function VH = solve_poisson_fft_zero_mode(rho, gridCache)
-%Solve poisson FFT zero mode.
+% Solve the periodic Poisson equation with the zero Fourier mode removed.
 
 m = size(rho, 1);
 L = gridCache.L;
@@ -136,40 +126,4 @@ VHat(mask) = 4 * pi * rhoHat(mask) ./ G2(mask);
 VHat(~mask) = 0;
 
 VH = ifftn(VHat, 'symmetric');
-end
-
-function [Vxc, epsxc] = vxc_pz81_unpolarized(rho)
-%Compute pz81 unpolarized.
-gamma = -0.1423;
-beta1 = 1.0529;
-beta2 = 0.3334;
-A = 0.0311;
-B = -0.0480;
-C = 0.0020;
-D = -0.0116;
-
-rho = max(real(rho), 1e-14);
-
-epsx = -(3 / 4) * (3 / pi) ^ (1 / 3) .* rho .^ (1 / 3);
-Vx = -(3 / pi) ^ (1 / 3) .* rho .^ (1 / 3);
-
-rs = (3 ./ (4 * pi * rho)) .^ (1 / 3);
-
-epsc = zeros(size(rho));
-Vc = zeros(size(rho));
-
-m1 = (rs >= 1);
-r1 = rs(m1);
-den = 1 + beta1 * sqrt(r1) + beta2 * r1;
-epsc(m1) = gamma ./ den;
-Vc(m1) = epsc(m1) + (gamma .* r1 / 3) .* ...
-    ((beta1 ./ (2 * sqrt(r1)) + beta2) ./ den .^ 2);
-
-m2 = ~m1;
-r2 = rs(m2);
-epsc(m2) = A * log(r2) + B + C * r2 .* log(r2) + D * r2;
-Vc(m2) = epsc(m2) - (1 / 3) * (A + C * r2 .* (log(r2) + 1) + D * r2);
-
-epsxc = epsx + epsc;
-Vxc = Vx + Vc;
 end

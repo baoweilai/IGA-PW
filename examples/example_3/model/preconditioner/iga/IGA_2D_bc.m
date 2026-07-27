@@ -1,5 +1,5 @@
 function [A,rhs]=IGA_2D_bc(A,rhs,m,n)
-%Mark boundary degrees of freedom for the 2-D IGA mesh.
+% Mark boundary degrees of freedom for the 2-D IGA mesh.
 Node_down=1:m;
 Node_up=m*(n-1)+(1:m);
 Node_left=1+(0:n-1)*m;

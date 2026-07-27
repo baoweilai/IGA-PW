@@ -1,27 +1,37 @@
-﻿function run_h_data()
-%Generate h-convergence data.
+function run_h_data()
+% Generate h-convergence data.
 
 clc; close all;
 
-activate_example_workflow('h_convergence', ...
-    {'nurbs', 'iga', 'assembly', 'operators', 'core', 'solver'});
+% Set project paths and the workflow data directory.
 exampleDir = fileparts(fileparts(fileparts(mfilename('fullpath'))));
+projectDir = fileparts(fileparts(exampleDir));
+utilsDir = fullfile(projectDir, 'src', 'utils');
+assert(isfolder(utilsDir), 'Missing project utils directory: %s', utilsDir);
+addpath(utilsDir, '-begin');
+primmeDir = fullfile(projectDir, 'external', 'primme', 'Matlab');
+assert(isfolder(primmeDir), 'Missing PRIMME directory: %s', primmeDir);
+addpath(primmeDir, '-begin');
+
+activate_example_workflow('h_convergence', ...
+    {'nurbs', 'iga', 'assembly', 'operators', 'core'});
 dataDir = fullfile(exampleDir, 'data');
-oldDir = pwd;
-cleanupObj = onCleanup(@() cd(oldDir));
+startDir = pwd;
+cleanupObj = onCleanup(@() cd(startDir));
 cd(dataDir);
 
+% Set the h-convergence and SCF parameters.
 Example    = 'Example_3';
 Nc         = 20;
-nElem_list = [8 10 12 14 16 18 20 22 24];
+nElem_list = [4 8 16 32 64];
 t_list     = 0:1;   % p = 1, 2
 
-beta = 20;
+beta = 100;
 n_gp = 30;
-inner_cheb_n = 100;
-pw_fft_grid_n = 500;
+inner_cheb_n = 150;
+pw_fft_grid_n = 550;
 
-primme_tol         = 1e-7;
+primme_tol         = 1e-9;
 primme_maxit       = 1e8;
 primme_method      = 'DEFAULT_MIN_TIME';
 primme_reportLevel = 0;
@@ -31,9 +41,9 @@ iface_reg          = 1e-12;
 
 scf_maxit        = 60;
 scf_pw_grid_m    = 500;
-scf_tol_lambda   = 1e-6;
+scf_tol_lambda   = 1e-7;
 scf_mixing       = 0.9;
-scf_track_n_eigs = 2;
+scf_track_n_eigs = 1;
 
 save_eigenvectors = true;
 save_nurbs        = true;
@@ -51,6 +61,7 @@ if ~exist(cachePwRoot, 'dir'), mkdir(cachePwRoot); end
 cacheNurbsRoot = fullfile(resultRoot, 'cache_nurbs');
 if ~exist(cacheNurbsRoot, 'dir'), mkdir(cacheNurbsRoot); end
 
+% Solve or load each degree and mesh case.
 for t = t_list
     pdeg = 1 + t;
     caseDir = fullfile(resultRoot, sprintf('p_%d', pdeg));
@@ -133,6 +144,7 @@ for t = t_list
         fprintf('time    = %.6fs, eigs = %.6fs\n', meta.time_total, meta.time_eigs);
     end
 
+    % Save the h-convergence summary.
     T = table(nElem_list(:), h_list, dof_list, lambda1_list, ...
         'VariableNames', {'nElem','h','dof','lambda1'});
 

@@ -1,7 +1,8 @@
 ﻿function out = plot_cutoff_convergence(userCfg)
-%Plot cutoff-convergence data.
+% Plot cutoff-convergence data.
 assert(exist('userCfg', 'var') == 1, 'plot_cutoff_convergence requires userCfg.');
 
+% Resolve workflow paths and read the cutoff configuration.
 clc;
 rootDir = fileparts(fileparts(mfilename('fullpath')));
 add_workflow_paths(fullfile(rootDir, 'model', 'cutoff_convergence'), ...
@@ -16,6 +17,7 @@ pw = H.cfg.pw;
 finalDir = fullfile(rootDir, 'data', 'result', 'PW', 'convergence');
 if ~exist(finalDir, 'dir'), mkdir(finalDir); end
 
+% Load the reference eigenvalue and allocate case errors.
 refRunFile = H.case_run_file('reference', H.cfg.reference.p, ...
     H.cfg.reference.Nc, H.cfg.reference.Nelement);
 lambdaRef = read_lambda_local(refRunFile);
@@ -31,6 +33,7 @@ dgOpt = struct('innerGridN', H.cfg.state_error_grid_n, ...
     'faceGridN', H.cfg.state_error_grid_n, ...
     'chunkSize', 1200, 'Csigma', 10);
 
+% Evaluate eigenvalue and DG errors for every cutoff.
 for i = 1:nCase
     runFile = H.case_run_file('pw', pw.fixed_p, KList(i), pw.fixed_Nelement);
     lambda(i) = read_lambda_local(runFile);
@@ -48,6 +51,7 @@ end
 
 [eigDecay, dgDecay, eigReduction, dgReduction] = adjacent_rates_local(KList, eigErr, dgErr);
 
+% Build and save value and adjacent-rate tables.
 values = table(KList(:), repmat(pw.fixed_p, nCase, 1), ...
     repmat(pw.fixed_Nelement, nCase, 1), lambda, ...
     repmat(lambdaRef, nCase, 1), eigErr, dgErr, ...
@@ -63,24 +67,23 @@ orders = table(KList(1:end-1).', KList(2:end).', ...
 writetable(values, fullfile(finalDir, 'values.csv'));
 writetable(orders, fullfile(finalDir, 'orders.csv'));
 
+% Draw the combined convergence plot and export its data.
 fig = plot_combined_local(KList, eigErr, dgErr);
 
-pngFile = fullfile(finalDir, 'cutoff.png');
 pdfFile = fullfile(finalDir, 'cutoff.pdf');
-exportgraphics(fig, pngFile, 'Resolution', 600);
 exportgraphics(fig, pdfFile, 'ContentType', 'vector');
 
 save(fullfile(finalDir, 'data.mat'), 'KList', 'lambda', 'lambdaRef', ...
     'eigErr', 'dgErr', 'eigDecay', 'dgDecay', 'eigReduction', ...
     'dgReduction', '-v7.3');
 
-out = struct('fig', fig, 'png', pngFile, 'pdf', pdfFile, ...
+out = struct('fig', fig, 'pdf', pdfFile, ...
     'values', values, 'orders', orders);
 
 end
 
 function fig = plot_combined_local(KList, eigErr, dgErr)
-%Plot combined convergence curves.
+% Plot combined convergence curves.
 cfg = style_local();
 eigLabel = '$|\lambda_1-\lambda_{1}^{\mathrm{DG}}|$';
 dgLabel = '$\|u_1-u_{1}^{\mathrm{DG}}\|_{\mathrm{DG}}$';
@@ -100,7 +103,7 @@ legend(ax, 'show', 'Location', 'northeast', 'Interpreter', 'latex', ...
 end
 
 function fig = make_figure_local(cfg)
-%Create a figure with the saved size.
+% Create a figure with the saved size.
 fig = figure('Color', cfg.fig.bgColor, ...
     'Units', 'inches', ...
     'Position', [1 1 cfg.fig.width cfg.fig.height], ...
@@ -109,7 +112,7 @@ set(fig, 'ToolBar', 'none', 'MenuBar', 'none');
 end
 
 function style_line_local(lineObj, cfg, color, marker, labelText)
-%Apply line styling.
+% Apply line styling.
 set(lineObj, ...
     'LineWidth', cfg.lw, ...
     'Marker', marker, ...
@@ -121,7 +124,7 @@ set(lineObj, ...
 end
 
 function style_axes_local(ax, cfg)
-%Apply axis styling.
+% Apply axis styling.
 ax.Units = 'normalized';
 ax.Position = [ ...
     cfg.layout.left, ...
@@ -141,7 +144,7 @@ grid(ax, 'off');
 end
 
 function finish_axes_local(ax, KList, err, cfg)
-%Finalize axis labels and limits.
+% Finalize axis labels and limits.
 yMin = min(err(err > 0));
 yMax = max(err);
 set(ax, ...
@@ -151,7 +154,7 @@ set(ax, ...
 end
 
 function cfg = style_local()
-%Return style values for this plot.
+% Return style values for this plot.
 cfg.fig.width    = 4.8;
 cfg.fig.height   = 3.0;
 cfg.fig.renderer = 'painters';
@@ -183,7 +186,7 @@ cfg.padYHigh = 15;
 end
 
 function [eigDecay, dgDecay, eigReduction, dgReduction] = adjacent_rates_local(KList, eigErr, dgErr)
-%Compute rates between adjacent data points.
+% Compute rates between adjacent data points.
 dK = diff(KList(:));
 eigReduction = eigErr(1:end-1) ./ eigErr(2:end);
 dgReduction = dgErr(1:end-1) ./ dgErr(2:end);
@@ -192,7 +195,7 @@ dgDecay = log(dgReduction) ./ dK;
 end
 
 function lambda = read_lambda_local(runFile)
-%Read eigenvalue data from a MAT file.
+% Read eigenvalue data from a MAT file.
 S = load(runFile, 'run');
 lambda = real(S.run.lambda(1));
 end

@@ -1,7 +1,11 @@
 ﻿function plot_cutoff_convergence()
-%Plot cutoff-convergence data.
+% Plot cutoff-convergence data.
 clc; close all;
 format short g;
+
+figDir = fileparts(mfilename('fullpath'));
+exampleDir = fileparts(figDir);
+addpath(fullfile(exampleDir, 'model', 'cutoff_convergence', 'nurbs'));
 
 %% --------------------- Global interpreter ---------------------
 set(groot, ...
@@ -12,12 +16,12 @@ set(groot, ...
 % User settings
 Example          = 'Example_2';
 Nc_list          = [4 6 8 10 12];
-p_list           = [2];
+p_list           = 2;
 Refine_fixed     = 7;
 eig_list         = [1 2 3];
 n_eigenvalues    = 4;
+dx               = 5e-3;
 
-usePaperRef      = false;
 refNc            = 45;
 refP             = 3;
 refRefine        = 8;
@@ -25,10 +29,6 @@ refRefine        = 8;
 refTag = sprintf('refine_%02d', Refine_fixed);
 
 outSubDirName = 'cache_Nc';
-savePNG       = true;
-savePDF       = true;
-saveFIG       = false;
-pngDPI        = 600;
 
 cfg.fig.width    = 4.8;
 cfg.fig.height   = 3.0;
@@ -48,9 +48,6 @@ cfg.axes.yMinorTick = 'off';
 cfg.axes.labelSize  = 13;
 cfg.axes.box        = 'on';
 
-gridOn        = false;
-minorGridOn   = false;
-
 useCustomColors = true;
 lineColors255 = [ ...
     223 122  94;   % lambda_1
@@ -60,7 +57,6 @@ lineColors255 = [ ...
     ];
 lineStyles = {'-','-','-','-'};
 markers    = {'o','s','^','d','x','+'};
-markerFilled = false;
 lw = 1.8;
 ms = 6;
 
@@ -78,10 +74,8 @@ padX_right = 0.06;
 padY_low   = 1;
 padY_high  = 1;
 
-showTitle = false;
-
 % Paths
-resultRoot = fullfile(pwd, 'result', Example);
+resultRoot = fullfile(exampleDir, 'data', 'result', Example);
 if ~exist(resultRoot,'dir')
     error('Cannot find resultRoot: %s', resultRoot);
 end
@@ -94,6 +88,9 @@ assert(height(Tref) == 1, 'Expected exactly one latest reference row for refine=
 lambda_ref_latest = [Tref.lambda1, Tref.lambda2, Tref.lambda3, Tref.lambda4];
 fprintf('[REF ] latest reference Nc=%d p=%d refine=%d lambda=%s\n', ...
     refNc, refP, refRefine, mat2str(lambda_ref_latest, 12));
+refRun = fullfile(resultRoot, sprintf('Nc_%d', refNc), sprintf('p_%d', refP), ...
+    sprintf('refine_%02d', refRefine), 'run.mat');
+assert(exist(refRun, 'file') == 2, 'Missing reference run: %s', refRun);
 
 outRoot = fullfile(resultRoot, outSubDirName, refTag);
 if ~exist(outRoot,'dir')
@@ -112,36 +109,39 @@ for pp = p_list
 
     lambda_ref = lambda_ref_latest;
 
-    fig = plot_semilogy_err_vs_Nc( ...
-        Nc_ok, lam_ok, lambda_ref, eig_list, ...
-        useCustomColors, lineColors255, lineStyles, markers, markerFilled, lw, ms, ...
+    err = abs(lam_ok(:, eig_list) - lambda_ref(1, eig_list));
+    labels = arrayfun(@(i) sprintf('$i=%d$', i), eig_list, 'UniformOutput', false);
+    fig = plot_semilogy_data( ...
+        Nc_ok, err, labels, '$|\lambda_i-\lambda_i^{\mathrm{DG}}|$', ...
+        useCustomColors, lineColors255, lineStyles, markers, lw, ms, ...
         legendLocation, legendBox, cfg.legend.fontSize, ...
         xTickMode, yTickMode, yTickExp_p1, yTickExp_p2, ...
         padX_left, padX_right, padY_low, padY_high, ...
-        showTitle, Example, pp, Refine_fixed, usePaperRef, ...
-        gridOn, minorGridOn, cfg);
+        cfg);
 
     pOutRoot = fullfile(outRoot, sprintf('p_%d', pp));
     if ~exist(pOutRoot, 'dir'), mkdir(pOutRoot); end
-    figBase = 'cutoff';
+    save_plot(fig, pOutRoot, 'cutoff');
 
-    if savePNG
-        outPng = fullfile(pOutRoot, [figBase '.png']);
-        exportgraphics(fig, outPng, 'Resolution', pngDPI);
-        fprintf('[SAVED] %s\n', outPng);
-    end
+    files = arrayfun(@(K) fullfile(resultRoot, sprintf('Nc_%d', K), ...
+        sprintf('p_%d', pp), refTag, 'run.mat'), Nc_ok, 'UniformOutput', false);
+    [eigErr, sigma] = cutoff_eigerr(files, refRun, eig_list, dx);
+    figEig = plot_semilogy_data( ...
+        Nc_ok, eigErr, labels, '$\|u_i-u_i^{\mathrm{DG}}\|_{\mathrm{DG}}$', ...
+        useCustomColors, lineColors255, lineStyles, markers, lw, ms, ...
+        legendLocation, legendBox, cfg.legend.fontSize, ...
+        xTickMode, yTickMode, yTickExp_p1, yTickExp_p2, ...
+        padX_left, padX_right, padY_low, padY_high, ...
+        cfg);
+    save_plot(figEig, pOutRoot, 'cutoff_eigfun');
 
-    if savePDF
-        outPdf = fullfile(pOutRoot, [figBase '.pdf']);
-        exportgraphics(fig, outPdf, 'ContentType', 'vector');
-        fprintf('[SAVED] %s\n', outPdf);
+    Teig = table(Nc_ok(:), sigma, 'VariableNames', {'Nc','sigma'});
+    for j = 1:numel(eig_list)
+        Teig.(sprintf('u%d_DG', eig_list(j))) = eigErr(:, j);
     end
-
-    if saveFIG
-        outFig = fullfile(pOutRoot, [figBase '.fig']);
-        saveas(fig, outFig);
-        fprintf('[SAVED] %s\n', outFig);
-    end
+    eigCsv = fullfile(pOutRoot, 'eigfun_DG.csv');
+    writetable(Teig, eigCsv);
+    fprintf('[SAVED] %s\n', eigCsv);
 
     % Save the cutoff summary for the manuscript plot.
     Tsum = table(Nc_ok(:), dof_ok(:), 'VariableNames', {'Nc','dof'});
@@ -153,7 +153,6 @@ for pp = p_list
     fprintf('[SAVED] %s\n', out_csv);
 
     % orders
-    err = abs(lam_ok(:,eig_list) - lambda_ref(1,eig_list));
     assert(all(err(:) > 0), 'Cutoff-convergence errors must be positive.');
     rate = local_exp_rates_Nc(Nc_ok(:), err);
 
@@ -181,9 +180,17 @@ end
 fprintf('\n[DONE] All outputs in: %s\n', outRoot);
 end
 
+function save_plot(fig, outDir, name)
+% Save one figure as a PDF.
+file = fullfile(outDir, [name '.pdf']);
+exportgraphics(fig, file, 'ContentType', 'vector');
+fprintf('[SAVED] %s\n', file);
+end
+
 function [Nc_ok, lam_ok, dof_ok] = ...
 read_runs_over_Nc(resultRoot, Nc_list, pdeg, refTag, n_eigs)
 
+% Load cutoff results across the requested plane-wave cutoffs.
 nNc   = numel(Nc_list);
 lamNc = zeros(nNc, n_eigs);
 dofNc = zeros(nNc, 1);
@@ -215,16 +222,16 @@ lam_ok    = lam_ok(idx,:);
 dof_ok    = dof_ok(idx);
 end
 
-function fig = plot_semilogy_err_vs_Nc( ...
-Nc_ok, lam_ok, lambda_ref, eig_list, ...
-    useCustomColors, lineColors255, lineStyles, markers, markerFilled, lw, ms, ...
+function fig = plot_semilogy_data( ...
+Nc_ok, err, legLabels, yLabel, ...
+    useCustomColors, lineColors255, lineStyles, markers, lw, ms, ...
     legendLocation, legendBox, legendFontSize, ...
     xTickMode, yTickMode, yTickExp_p1, yTickExp_p2, ...
     padX_left, padX_right, padY_low, padY_high, ...
-    showTitle, Example, pdeg, refine_fixed, usePaperRef, ...
-    gridOn, minorGridOn, cfg)
+    cfg)
 
-err = abs(lam_ok(:,eig_list) - lambda_ref(1,eig_list));
+% Plot and style a semilog convergence figure.
+% Validate the error data and create the plotting axes.
 assert(all(err(:) > 0), 'Cutoff-convergence errors must be positive.');
 
 fig = figure( ...
@@ -244,32 +251,33 @@ ax.Position = [ ...
     1-cfg.layout.left-cfg.layout.right, ...
     1-cfg.layout.bottom-cfg.layout.top];
 
+% Select line styles and draw every eigenvalue curve.
 if useCustomColors
     colors = double(lineColors255)/255;
 else
-    colors = lines(max(8, numel(eig_list)));
+    colors = lines(max(8, size(err, 2)));
 end
 nC  = size(colors,1);
 nLS = numel(lineStyles);
 nMK = numel(markers);
 
-hEig = gobjects(1, numel(eig_list));
+hEig = gobjects(1, size(err, 2));
 
-for j = 1:numel(eig_list)
+for j = 1:size(err, 2)
     col = colors(mod(j-1,nC)+1,:);
     ls  = lineStyles{mod(j-1,nLS)+1};
     mk  = markers{mod(j-1,nMK)+1};
-    mfc = ternary(markerFilled, col, 'w');
 
     hEig(j) = semilogy(ax, Nc_ok, err(:,j), ls, ...
         'LineWidth', lw, ...
         'Color', col, ...
         'Marker', mk, ...
         'MarkerSize', ms, ...
-        'MarkerFaceColor', mfc, ...
+        'MarkerFaceColor', 'w', ...
         'MarkerEdgeColor', col);
 end
 
+% Apply logarithmic axes, labels, and legend styling.
 set(ax, ...
     'XScale',     'linear', ...
     'YScale',     'log', ...
@@ -282,19 +290,9 @@ set(ax, ...
 
 ax.TickLabelInterpreter = 'latex';
 
-if gridOn
-    grid(ax,'on');
-else
-    grid(ax,'off');
-end
-
-if minorGridOn
-    ax.XMinorGrid = 'on';
-    ax.YMinorGrid = 'on';
-else
-    ax.XMinorGrid = 'off';
-    ax.YMinorGrid = 'off';
-end
+grid(ax,'off');
+ax.XMinorGrid = 'off';
+ax.YMinorGrid = 'off';
 
 ax.XRuler.MinorTick = 'off';
 ax.YRuler.MinorTick = 'off';
@@ -303,25 +301,17 @@ xlabel(ax, '$K$', ...
     'Interpreter', 'latex', ...
     'FontSize', cfg.axes.labelSize);
 
-ylabel(ax, '$|\lambda_i-\lambda_{i}^{\mathrm{DG}}|$', ...
+ylabel(ax, yLabel, ...
     'Interpreter', 'latex', ...
     'FontSize', cfg.axes.labelSize);
 
-legLabels = arrayfun(@(q) sprintf('$i={%d}$', q), eig_list, 'UniformOutput', false);
 lgd = legend(ax, hEig, legLabels, ...
     'Location', legendLocation, ...
     'Interpreter', 'latex', ...
     'FontSize', legendFontSize);
 lgd.Box = legendBox;
 
-if showTitle
-    refStr = ternary(usePaperRef,'paper-ref','self-ref');
-    title(ax, sprintf('%s, refine=%d, p=%d (%s)', Example, refine_fixed, pdeg, refStr), ...
-        'FontSize', cfg.axes.labelSize, ...
-        'FontWeight', 'normal', ...
-        'Interpreter', 'none');
-end
-
+% Derive axis limits and ticks from the plotted data.
 xMin = min(Nc_ok);
 xMax = max(Nc_ok);
 xRng = xMax - xMin;
@@ -376,7 +366,7 @@ ax.YLim = axisSpec.YLim;
 end
 
 function rate = local_exp_rates_Nc(Nc, err)
-%Compute exp rates nc.
+% Estimate exponential convergence rates between successive cutoffs.
 Nc = Nc(:);
 n  = numel(Nc);
 ne = size(err,2);
@@ -389,29 +379,11 @@ end
 end
 
 function y = round_sig(x, nSig)
-%Round a value to significant digits.
+% Round a value to significant digits.
 y = x;
 mask = isfinite(x) & (x ~= 0);
 ax = abs(x(mask));
 p  = floor(log10(ax));
 scale = 10.^(nSig-1-p);
 y(mask) = round(x(mask).*scale)./scale;
-end
-
-function s = ternary(cond, a, b)
-%Select one of two values.
-if cond
-    s = a;
-else
-    s = b;
-end
-end
-
-function t = onoff(flag)
-%Convert a logical value to on/off text.
-if flag
-    t = 'on';
-else
-    t = 'off';
-end
 end

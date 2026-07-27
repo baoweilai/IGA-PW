@@ -1,5 +1,5 @@
 function Pw=WightedConPtsVolume(ConPts,weights)
-%Convert volume control points to homogeneous form.
+% Convert volume control points to homogeneous form.
 
 [nu,nv,nw,ndim]=size(ConPts);
 Pw=zeros(nu,nv,nw,ndim+1);

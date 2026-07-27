@@ -1,14 +1,14 @@
-function [knotU,knotV,knotW] =  updateKnotVectors_3D(nurbs_original)
-%Update 3-D knot vectors after refinement.
+function [knotU,knotV,knotW] =  updateKnotVectors_3D(nurbs_base)
+% Update 3-D knot vectors after refinement.
 
-knotU = nurbs_original.knotU;
-knotV = nurbs_original.knotV;
-knotW = nurbs_original.knotW;
+knotU = nurbs_base.knotU;
+knotV = nurbs_base.knotV;
+knotW = nurbs_base.knotW;
 
 
-% nurbs_original.Lengths
+% Use the base-domain lengths to set knot spacing.
 
-a = nurbs_original.Lengths;
+a = nurbs_base.Lengths;
 
 dx = min(a);
 

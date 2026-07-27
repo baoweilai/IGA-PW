@@ -1,6 +1,6 @@
 function [bp,wf]=grule(n)
-%Compute Gauss quadrature points and weights.
-bp=zeros(n,1); wf=bp; iter=2; m=fix((n+1)/2); e1=n*(n+1);
+% Compute Gauss quadrature points and weights.
+iter=2; m=fix((n+1)/2); e1=n*(n+1);
 mm=4*m-1; t=(pi/(4*n+2))*(3:4:mm); nn=(1-(1-1/n)/(8*n*n));
 xo=nn*cos(t);
 for j=1:iter

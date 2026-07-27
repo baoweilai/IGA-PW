@@ -1,5 +1,5 @@
 function L2_err   = Compute_L2_Error(nurbs_original,nurbs_refine,uh,ref_nurbs,ref_uh)
-%Compute the L2 error on the comparison grid.
+% Compute the L2 error on the comparison grid.
 
 % This script is used to compute the $L^2$ norm, $H^1$ semi-norm and $H^2$
 % semi-norm  error between $u$ and the IGA solution $u_h$.

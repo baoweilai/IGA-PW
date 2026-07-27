@@ -1,5 +1,5 @@
 function [knotU,knotV] =  updateKnotVectors_2D(knotU,knotV,a,b)
-%Update 2-D knot vectors after refinement.
+% Update 2-D knot vectors after refinement.
 if b> a
     n = fix(b/a);
 else

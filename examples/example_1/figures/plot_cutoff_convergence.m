@@ -1,8 +1,12 @@
 function plot_cutoff_convergence()
-%Plot cutoff-convergence data.
+% Plot cutoff-convergence data.
 
 clc; close all;
 format short g;
+
+figDir = fileparts(mfilename('fullpath'));
+exampleDir = fileparts(figDir);
+addpath(fullfile(exampleDir, 'model', 'cutoff_convergence', 'nurbs'));
 
 set(groot, ...
     'defaultTextInterpreter', 'latex', ...
@@ -19,6 +23,11 @@ cfg.p_list  = [1 2];
 cfg.Refine_fixed  = 7;
 cfg.eig_list      = [1 2 3 4];
 cfg.n_eigenvalues = 4;
+cfg.ref_Nc        = 45;
+cfg.ref_p         = 3;
+cfg.ref_refine    = 8;
+cfg.dx_in         = 5e-3;
+cfg.dx_out        = 5e-3;
 
 % -------------------- reference eigenvalues --------------------
 cfg.lambda_ref = [ ...
@@ -31,11 +40,6 @@ cfg.lambda_ref = [ ...
 % -------------------- output settings --------------------
 cfg.refTag        = sprintf('refine_%02d', cfg.Refine_fixed);
 cfg.outSubDirName = 'cache_Nc';
-
-cfg.savePNG = true;
-cfg.savePDF = true;
-cfg.saveFIG = false;
-cfg.pngDPI  = 600;
 
 % -------------------- figure settings --------------------
 cfg.fig.width    = 4.8;
@@ -60,10 +64,6 @@ cfg.axes.box        = 'on';
 cfg.axes.xScale     = 'linear';
 cfg.axes.yScale     = 'log';
 
-% -------------------- grid style --------------------
-cfg.gridOn      = false;
-cfg.minorGridOn = false;
-
 % -------------------- curve style --------------------
 cfg.lineColors255 = [ ...
     223 122  94;
@@ -74,7 +74,6 @@ cfg.lineColors255 = [ ...
 
 cfg.lineStyles   = {'-','-','-','-'};
 cfg.markers      = {'o','s','^','d','x','+'};
-cfg.markerFilled = false;
 cfg.lw           = 1.8;
 cfg.ms           = 8;
 
@@ -85,11 +84,9 @@ cfg.legend.box        = 'off';
 cfg.legend.numColumns = 1;
 
 % -------------------- y-axis manual control --------------------
-cfg.useManualYTicks = true;
 cfg.yTickExp_p1 = [-1 -2 -3 -4 -5 -6 -7];
 cfg.yTickExp_p2 = [-1 -2 -3 -4 -5 -6 -7];
 
-cfg.useManualYLim = true;
 cfg.manualYLim_p1 = [1e-7, 1e-1];
 cfg.manualYLim_p2 = [1e-7, 1e-1];
 
@@ -101,7 +98,7 @@ cfg.padY_high  = 1;
 
 % 2. Build paths
 
-resultRoot = fullfile(pwd, 'result', cfg.Example);
+resultRoot = fullfile(exampleDir, 'data', 'result', cfg.Example);
 if ~exist(resultRoot, 'dir')
     error('Cannot find resultRoot: %s', resultRoot);
 end
@@ -113,9 +110,29 @@ end
 
 cfg.Nc_list = cfg.Nc_list(:).';
 
+runFiles = cell(numel(cfg.p_list), numel(cfg.Nc_list));
+for ip = 1:numel(cfg.p_list)
+    for iNc = 1:numel(cfg.Nc_list)
+        runFiles{ip, iNc} = fullfile(resultRoot, ...
+            sprintf('Nc_%d', cfg.Nc_list(iNc)), ...
+            sprintf('p_%d', cfg.p_list(ip)), cfg.refTag, 'run.mat');
+        assert(exist(runFiles{ip, iNc}, 'file') == 2, ...
+            'Missing run file: %s', runFiles{ip, iNc});
+    end
+end
+
+refFile = fullfile(resultRoot, sprintf('Nc_%d', cfg.ref_Nc), ...
+    sprintf('p_%d', cfg.ref_p), sprintf('refine_%02d', cfg.ref_refine), 'run.mat');
+assert(exist(refFile, 'file') == 2, 'Missing reference run file: %s', refFile);
+
+cacheFile = fullfile(outRoot, 'eigenfunction_dg_errors.mat');
+[eigfunDG, sigmaDG] = load_or_compute_eigenfunction_errors( ...
+    cacheFile, runFiles, refFile, cfg);
+
 % 3. Main loop: fixed refine, sweep Nc
 
-for pp = cfg.p_list
+for ip = 1:numel(cfg.p_list)
+    pp = cfg.p_list(ip);
     fprintf('\n==================== [P=%d] fixed refine=%d, sweep Nc ====================\n', ...
         pp, cfg.Refine_fixed);
 
@@ -128,25 +145,22 @@ for pp = cfg.p_list
 
     pOutRoot = fullfile(outRoot, sprintf('p_%d', pp));
     if ~exist(pOutRoot, 'dir'), mkdir(pOutRoot); end
-    figBase = 'cutoff';
+    save_plot(fig, pOutRoot, 'cutoff');
 
-    if cfg.savePNG
-        outPng = fullfile(pOutRoot, [figBase '.png']);
-        exportgraphics(fig, outPng, 'Resolution', cfg.pngDPI);
-        fprintf('[SAVED] %s\n', outPng);
-    end
+    eigfunDG_p = reshape(eigfunDG(ip, :, :), numel(cfg.Nc_list), []);
+    assert(isequal(Nc_ok(:), cfg.Nc_list(:)), ...
+        'The eigenvalue and eigenfunction cutoff grids do not agree.');
+    figEigfun = plot_semilogy_eigfun_vs_Nc( ...
+        Nc_ok, eigfunDG_p, cfg.eig_list, pp, cfg);
+    save_plot(figEigfun, pOutRoot, 'cutoff_eigenfunction');
 
-    if cfg.savePDF
-        outPdf = fullfile(pOutRoot, [figBase '.pdf']);
-        exportgraphics(fig, outPdf, 'ContentType', 'vector');
-        fprintf('[SAVED] %s\n', outPdf);
+    Teigfun = table(Nc_ok(:), sigmaDG(ip, :).', 'VariableNames', {'Nc','sigma'});
+    for j = 1:numel(cfg.eig_list)
+        Teigfun.(sprintf('u%d_DG', cfg.eig_list(j))) = eigfunDG_p(:, j);
     end
-
-    if cfg.saveFIG
-        outFig = fullfile(pOutRoot, [figBase '.fig']);
-        saveas(fig, outFig);
-        fprintf('[SAVED] %s\n', outFig);
-    end
+    outEigfunCsv = fullfile(pOutRoot, 'eigenfunction_DG.csv');
+    writetable(Teigfun, outEigfunCsv);
+    fprintf('[SAVED] %s\n', outEigfunCsv);
 
     Tsum = table(Nc_ok(:), dof_ok(:), 'VariableNames', {'Nc','dof'});
 
@@ -199,6 +213,53 @@ end
 fprintf('\n[DONE] All outputs in: %s\n', outRoot);
 end
 
+function [errDG, sigmaDG] = load_or_compute_eigenfunction_errors( ...
+    cacheFile, runFiles, refFile, cfg)
+% The cached aligned errors correspond to the current runs and integration code.
+helperFile = fullfile(fileparts(mfilename('fullpath')), ...
+    'cutoff_eigenfunction_errors.m');
+sourceFiles = [runFiles(:); {refFile}; {helperFile}];
+newestSource = 0;
+for i = 1:numel(sourceFiles)
+    info = dir(sourceFiles{i});
+    assert(~isempty(info), 'Missing eigenfunction-error source: %s', sourceFiles{i});
+    newestSource = max(newestSource, info.datenum);
+end
+
+if exist(cacheFile, 'file') == 2
+    cacheInfo = dir(cacheFile);
+    C = load(cacheFile);
+    required = {'errDG','sigmaDG','NcCache','pCache','refineCache','refFileCache'};
+    valid = all(isfield(C, required)) && cacheInfo.datenum >= newestSource && ...
+        isequal(C.NcCache, cfg.Nc_list) && isequal(C.pCache, cfg.p_list) && ...
+        C.refineCache == cfg.Refine_fixed && strcmp(C.refFileCache, refFile);
+    if valid
+        errDG = C.errDG;
+        sigmaDG = C.sigmaDG;
+        fprintf('[CACHE] %s\n', cacheFile);
+        return;
+    end
+end
+
+eigBlocks = {1, 2, 3:4};
+[errDG, sigmaDG] = cutoff_eigenfunction_errors( ...
+    runFiles, refFile, eigBlocks, cfg.dx_in, cfg.dx_out);
+NcCache = cfg.Nc_list;
+pCache = cfg.p_list;
+refineCache = cfg.Refine_fixed;
+refFileCache = refFile;
+save(cacheFile, 'errDG', 'sigmaDG', 'NcCache', 'pCache', ...
+    'refineCache', 'refFileCache');
+fprintf('[SAVED] %s\n', cacheFile);
+end
+
+function save_plot(fig, outDir, baseName)
+% Export one cutoff figure.
+outPdf = fullfile(outDir, [baseName '.pdf']);
+exportgraphics(fig, outPdf, 'ContentType', 'vector');
+fprintf('[SAVED] %s\n', outPdf);
+end
+
 function [Nc_ok, lam_ok, dof_ok] = ...
 read_runs_over_Nc(resultRoot, Nc_list, pdeg, refTag, n_eigs)
 
@@ -238,11 +299,28 @@ dof_ok    = dof_ok(idx);
 end
 
 function fig = plot_semilogy_err_vs_Nc(Nc_ok, lam_ok, lambda_ref, eig_list, pdeg, cfg)
-%Plot semilogy err vs nc.
-
+% Plot eigenvalue errors versus cutoff.
 err = abs(lam_ok(:, eig_list) - lambda_ref(1, eig_list));
-assert(all(err(:) > 0), 'Cutoff-convergence errors must be positive.');
+labels = arrayfun(@(q) sprintf('$i={%d}$', q), eig_list, 'UniformOutput', false);
+fig = plot_semilogy_curves(Nc_ok, err, labels, ...
+    '$|\lambda_i-\lambda_{i}^{\mathrm{DG}}|$', pdeg, cfg);
+end
 
+function fig = plot_semilogy_eigfun_vs_Nc(Nc_ok, errDG, eig_list, pdeg, cfg)
+% Plot only aligned DG eigenfunction errors versus cutoff.
+labels = arrayfun(@(q) sprintf('$i={%d}$', q), eig_list, 'UniformOutput', false);
+cfg.yTickExp_p1 = [];
+cfg.yTickExp_p2 = [];
+cfg.manualYLim_p1 = [];
+cfg.manualYLim_p2 = [];
+fig = plot_semilogy_curves(Nc_ok, errDG, labels, ...
+    '$\|u_i-u_{i}^{\mathrm{DG}}\|_{\mathrm{DG}}$', pdeg, cfg);
+end
+
+function fig = plot_semilogy_curves(Nc_ok, err, legLabels, yLabel, pdeg, cfg)
+% Apply the common Example 1 cutoff-convergence plot style.
+% Validate the error data and create the plotting axes.
+assert(all(err(:) > 0), 'Cutoff-convergence errors must be positive.');
 fig = figure( ...
     'Color',    cfg.fig.bgColor, ...
     'Units',    'inches', ...
@@ -260,34 +338,30 @@ ax.Position = [ ...
     1 - cfg.layout.left - cfg.layout.right, ...
     1 - cfg.layout.bottom - cfg.layout.top];
 
+% Draw one styled curve for each eigenvalue error.
 colors = double(cfg.lineColors255) / 255;
 
 nC  = size(colors,1);
 nLS = numel(cfg.lineStyles);
 nMK = numel(cfg.markers);
 
-hEig = gobjects(1, numel(eig_list));
+hEig = gobjects(1, size(err, 2));
 
-for j = 1:numel(eig_list)
+for j = 1:size(err, 2)
     col = colors(mod(j-1, nC) + 1, :);
     ls  = cfg.lineStyles{mod(j-1, nLS) + 1};
     mk  = cfg.markers{mod(j-1, nMK) + 1};
-
-    if cfg.markerFilled
-        mfc = col;
-    else
-        mfc = 'w';
-    end
 
     hEig(j) = semilogy(ax, Nc_ok, err(:,j), ls, ...
         'LineWidth', cfg.lw, ...
         'Color', col, ...
         'Marker', mk, ...
         'MarkerSize', cfg.ms, ...
-        'MarkerFaceColor', mfc, ...
+        'MarkerFaceColor', 'w', ...
         'MarkerEdgeColor', col);
 end
 
+% Apply logarithmic axes, labels, and legend styling.
 set(ax, ...
     'XScale',     cfg.axes.xScale, ...
     'YScale',     cfg.axes.yScale, ...
@@ -310,11 +384,9 @@ xlabel(ax, '$K$', ...
     'Interpreter', 'latex', ...
     'FontSize',    cfg.axes.labelSize);
 
-ylabel(ax, '$|\lambda_i-\lambda_{i}^{\mathrm{DG}}|$', ...
+ylabel(ax, yLabel, ...
     'Interpreter', 'latex', ...
     'FontSize',    cfg.axes.labelSize);
-
-legLabels = arrayfun(@(q) sprintf('$i={%d}$', q), eig_list, 'UniformOutput', false);
 
 lgd = legend(ax, hEig, legLabels, ...
     'Location',    cfg.legend.location, ...
@@ -323,6 +395,7 @@ lgd = legend(ax, hEig, legLabels, ...
     'NumColumns',  cfg.legend.numColumns);
 lgd.Box = cfg.legend.box;
 
+% Derive axis limits and ticks from the plotted data.
 xMin = min(Nc_ok);
 xMax = max(Nc_ok);
 xRng = xMax - xMin;
@@ -345,7 +418,7 @@ else
     manualYLim = cfg.manualYLim_p2;
 end
 
-if cfg.useManualYTicks
+if ~isempty(expsInput)
     exps = sort(expsInput(:).');
     axisSpec.YTick = 10.^exps;
     axisSpec.YTickLabel = arrayfun(@(e) sprintf('$10^{%d}$', e), exps, 'UniformOutput', false);
@@ -355,7 +428,7 @@ else
     axisSpec.YTickLabel = arrayfun(@(e) sprintf('$10^{%d}$', e), exps, 'UniformOutput', false);
 end
 
-if cfg.useManualYLim && numel(manualYLim) == 2 && all(manualYLim > 0)
+if numel(manualYLim) == 2 && all(manualYLim > 0)
     axisSpec.YLim = manualYLim;
 else
     axisSpec.YLim = [yMin / (1 + cfg.padY_low), yMax * (1 + cfg.padY_high)];
@@ -370,7 +443,7 @@ ax.YLim = axisSpec.YLim;
 end
 
 function rate = local_exp_rates_Nc(Nc, err)
-%Compute exp rates nc.
+% Estimate exponential convergence rates between successive cutoffs.
 
 Nc = Nc(:);
 n  = numel(Nc);
@@ -386,7 +459,7 @@ end
 end
 
 function y = round_sig(x, nSig)
-%Round a value to significant digits.
+% Round a value to significant digits.
 
 y = x;
 mask = isfinite(x) & (x ~= 0);
@@ -396,13 +469,4 @@ p  = floor(log10(ax));
 scale = 10.^(nSig - 1 - p);
 
 y(mask) = round(x(mask) .* scale) ./ scale;
-end
-
-function t = onoff(flag)
-%Convert a logical value to on/off text.
-if flag
-    t = 'on';
-else
-    t = 'off';
-end
 end

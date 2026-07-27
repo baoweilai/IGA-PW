@@ -7,7 +7,7 @@ add_required_paths(projectDir);
 exampleDir = fullfile(projectDir, 'examples', 'example_1');
 add_example_paths(exampleDir);
 add_workflow_paths(fullfile(exampleDir, 'model', 'scaled_errors'), ...
-    {'nurbs', 'dg', 'iga', 'assembly', 'operators', 'error_norms', 'core', 'solver'});
+    {'nurbs', 'dg', 'iga', 'assembly', 'operators', 'error_norms', 'core'});
 
 dataDir = fullfile(exampleDir, 'data');
 oldDir = pwd;
@@ -25,7 +25,8 @@ opts = struct();
 opts.Example = 'Example_1';
 opts.beta = 20;
 opts.n_gp = 10;
-opts.inner_cheb_n = 48;
+opts.inner_cheb_n = 200;
+opts.inner_quad_n = 1000;
 opts.pw_fft_grid_n = 256;
 opts.primme_tol = 1e-12;
 opts.primme_maxit = 5e7;
@@ -39,8 +40,6 @@ opts.save_pw_index = true;
 opts.use_pw_cache = true;
 opts.cacheRoot = cacheRoot;
 opts.outDir = outDir;
-opts.save_matrices = false;
-opts.save_mat = false;
 
 solve_iga_pw_dg(6, 2, 48, 1, opts);
 end
@@ -54,7 +53,6 @@ requiredDirs = {
     fullfile(projectDir, 'src', 'iga')
     fullfile(projectDir, 'src', 'pw')
     fullfile(projectDir, 'src', 'nurbs')
-    fullfile(projectDir, 'src', 'solvers')
     fullfile(projectDir, 'src', 'error_norms')
     fullfile(projectDir, 'src', 'postprocess')
     fullfile(projectDir, 'src', 'plotting')

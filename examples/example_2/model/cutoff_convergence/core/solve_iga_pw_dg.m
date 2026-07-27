@@ -1,12 +1,11 @@
 function [lambda, n_dofs_total, meta] = solve_iga_pw_dg(Refinement, t, Nc, n_eigenvalues, opts)
-%Solve the Example 2 IGA-PW-DG problem.
+% Solve the Example 2 IGA-PW-DG problem.
 
 format long;
 t_total = tic;
 
 % ---------------- Parameters ----------------
 beta = opts.beta;
-DIM  = 2; %#ok<NASGU>
 
 % Example 2 geometry
 L = 4;
@@ -215,13 +214,6 @@ if isfield(opts, 'outDir') && ~isempty(opts.outDir)
     run.n_pw_basis    = n_pw_basis;
     run.meta          = meta;
 
-    if isfield(opts,'save_matrices') && opts.save_matrices
-        run.M = M;
-        if isfield(opts,'save_mat') && opts.save_mat
-            run.Mat = Mat;
-        end
-    end
-
     if isfield(opts,'save_pw_index') && opts.save_pw_index
         run.k_pw = k_pw;
     end
@@ -243,7 +235,7 @@ end
 
 
 function nurbs_original = make_rect_patch(rect)
-%Build rect patch.
+% Build an affine rectangular NURBS patch.
 x1 = rect(1); x2 = rect(2);
 y1 = rect(3); y2 = rect(4);
 
@@ -259,7 +251,7 @@ nurbs_original.weights = [1 1; 1 1];
 end
 
 function [k_list, n_basis] = build_pw_disk(Nc)
-%Build the plane-wave disk basis.
+% Build the plane-wave disk basis.
 N = floor(Nc);
 k_list = zeros((2*N+1)^2, 2);
 n_basis = 0;
@@ -274,7 +266,7 @@ k_list = k_list(1:n_basis,:);
 end
 
 function [H_pw, M_pw] = get_pw_matrices_cached_example2(L, Nc, inner_domains_coordinates, k_Vr, n_pw_Vr, opts)
-%Return PW matrices cached example2.
+% Load or assemble the Example 2 plane-wave matrices.
 cache_ok = isfield(opts,'use_pw_cache') && opts.use_pw_cache ...
     && isfield(opts,'cacheRoot') && ~isempty(opts.cacheRoot);
 
@@ -298,7 +290,7 @@ end
 end
 
 function [uh, D, rnorms, stats] = call_primme_with_prec(Mat, M, n_eigs, targetMode, ops, method, Pfun)
-%Call PRIMME with the TB-DG preconditioner.
+% Call PRIMME with the TB-DG preconditioner.
 assert(~isempty(Pfun), 'call_primme_with_prec requires Pfun.');
 
 if strcmpi(targetMode, 'SA')
@@ -313,7 +305,7 @@ end
 end
 
 function Pfun = build_interface_block_preconditioner(Ktau, P, eps_diag, iface_reg)
-%Build the TB-DG interface-block preconditioner.
+% Build the TB-DG interface-block preconditioner.
 d = abs(diag(Ktau));
 d(d < eps_diag) = 1;
 gamma = find(sum(abs(P), 2) ~= 0);
@@ -325,13 +317,13 @@ Pfun = @(X) apply_interface_block_preconditioner(X, dinv, gamma, Dg);
 end
 
 function Z = apply_interface_block_preconditioner(X, dinv, gamma, Dg)
-%Apply the TB-DG interface-block preconditioner.
+% Apply the TB-DG interface-block preconditioner.
 Z = bsxfun(@times, X, dinv);
 Z(gamma, :) = Dg \ X(gamma, :);
 end
 
 function s = string_or_empty(x)
-%Convert a text value to a string.
+% Convert a text value to a string.
 if isempty(x)
     s = '';
 else
@@ -339,13 +331,12 @@ else
 end
 end
 
-% Offset versions of your 4 edge assembly functions
-% Only difference from original: edge_dofs_plus = local_edge_dofs + offset
+% Assemble the four translated IGA-PW boundary interfaces.
 
 function [P,S] = IGA_DG_Bottom_Edge_Assemble_offset(nurbs_original, nurbs_refine, pw_index, plane_wave_dofs_index, L, n_dofs, offset)
-%Assemble matrices or interface terms for the method.
+% Assemble the bottom-edge jump and average operators.
 
-DIM = 2; %#ok<NASGU>
+% Read the geometry and refined-basis data.
 
 ConPts_o   = nurbs_original.ConPts;
 weights_o  = nurbs_original.weights;
@@ -366,6 +357,7 @@ UBreaks          = nurbs_refine.UBreaks;
 uNoEs            = length(UBreaks) - 1;
 bottom_edge_dofs = nurbs_refine.bottom_edge_dofs;
 
+% Prepare bottom-edge segments, quadrature, and plane-wave traces.
 bottom_edge_node = zeros(uNoEs,2);
 for i=1:uNoEs
     bottom_edge_node(i,:) = [UBreaks(i),UBreaks(i+1)];
@@ -433,9 +425,9 @@ end
 end
 
 function [P,S] = IGA_DG_Top_Edge_Assemble_offset(nurbs_original, nurbs_refine, pw_index, plane_wave_dofs_index, L, n_dofs, offset)
-%Assemble matrices or interface terms for the method.
+% Assemble the top-edge jump and average operators.
 
-DIM = 2; %#ok<NASGU>
+% Read the geometry and refined-basis data.
 
 ConPts_o   = nurbs_original.ConPts;
 weights_o  = nurbs_original.weights;
@@ -456,6 +448,7 @@ UBreaks        = nurbs_refine.UBreaks;
 uNoEs          = length(UBreaks) - 1;
 top_edge_dofs  = nurbs_refine.top_edge_dofs;
 
+% Prepare top-edge segments, quadrature, and plane-wave traces.
 top_edge_node = zeros(uNoEs,2);
 for i=1:uNoEs
     top_edge_node(i,:) = [UBreaks(i),UBreaks(i+1)];
@@ -523,9 +516,9 @@ end
 end
 
 function [P,S] = IGA_DG_Left_Edge_Assemble_offset(nurbs_original, nurbs_refine, pw_index, plane_wave_dofs_index, L, n_dofs, offset)
-%Assemble matrices or interface terms for the method.
+% Assemble the left-edge jump and average operators.
 
-DIM = 2; %#ok<NASGU>
+% Read the geometry and refined-basis data.
 
 ConPts_o   = nurbs_original.ConPts;
 weights_o  = nurbs_original.weights;
@@ -546,6 +539,7 @@ VBreaks         = nurbs_refine.VBreaks;
 vNoEs           = length(VBreaks) - 1;
 left_edge_dofs  = nurbs_refine.left_edge_dofs;
 
+% Prepare left-edge segments, quadrature, and plane-wave traces.
 left_edge_node = zeros(vNoEs,2);
 for i=1:vNoEs
     left_edge_node(i,:) = [VBreaks(i),VBreaks(i+1)];
@@ -613,9 +607,9 @@ end
 end
 
 function [P,S] = IGA_DG_Right_Edge_Assemble_offset(nurbs_original, nurbs_refine, pw_index, plane_wave_dofs_index, L, n_dofs, offset)
-%Assemble matrices or interface terms for the method.
+% Assemble the right-edge jump and average operators.
 
-DIM = 2; %#ok<NASGU>
+% Read the geometry and refined-basis data.
 
 ConPts_o   = nurbs_original.ConPts;
 weights_o  = nurbs_original.weights;
@@ -636,6 +630,7 @@ VBreaks          = nurbs_refine.VBreaks;
 vNoEs            = length(VBreaks) - 1;
 right_edge_dofs  = nurbs_refine.right_edge_dofs;
 
+% Prepare right-edge segments, quadrature, and plane-wave traces.
 right_edge_node = zeros(vNoEs,2);
 for i=1:vNoEs
     right_edge_node(i,:) = [VBreaks(i),VBreaks(i+1)];

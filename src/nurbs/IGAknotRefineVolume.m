@@ -1,5 +1,5 @@
 function [Ubar,Vbar,Wbar,dof] = IGAknotRefineVolume(knotU,pu,knotV,pv,knotW,pw,Refinement)
-%Refine NURBS volume knot vectors.
+% Refine NURBS volume knot vectors.
 
 if isnumeric(Refinement) && isscalar(Refinement)
     Ubar = knotU;
@@ -53,7 +53,7 @@ dof = nu * nv * nw;
 end
 
 function K = build_open_uniform_knot(a, b, p, nElem)
-%Build an open uniform knot vector on [a,b].
+% Build an open uniform knot vector on [a,b].
 if nElem == 1
     K = [repmat(a, 1, p + 1), repmat(b, 1, p + 1)];
 else

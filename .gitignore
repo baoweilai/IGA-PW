@@ -1,6 +1,7 @@
 # Generated numerical data
-examples/**/data/
-paper_outputs/data/
+examples/**/data/*
+!examples/**/data/.gitkeep
+paper_outputs/
 
 # MATLAB binary results and caches
 *.mat

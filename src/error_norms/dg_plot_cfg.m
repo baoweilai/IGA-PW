@@ -1,5 +1,5 @@
 function cfg = dg_plot_cfg()
-%Return plotting data for DG error checks.
+% Return plotting data for DG error checks.
 cfg.Example = 'Example_5_3D_DG_PW_IGA_0414';
 cfg.fontName = 'Times New Roman';
 cfg.figWidth = 4.6;

@@ -1,5 +1,5 @@
 function apply_paper_plot_style()
-%Apply the shared figure style.
+% Apply the shared figure style.
 
 set(groot, ...
     'defaultTextInterpreter', 'latex', ...

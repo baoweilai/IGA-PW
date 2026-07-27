@@ -1,10 +1,11 @@
 function run_reference()
-%Build the fine-grid solution used by the cutoff DG curve.
+% Build the fine-grid solution used by the cutoff DG curve.
 
 clc; close all;
 
+% Set workflow paths and reference-case parameters.
 activate_example_workflow('cutoff_convergence', ...
-    {'nurbs', 'iga', 'assembly', 'operators', 'core', 'solver'});
+    {'nurbs', 'iga', 'assembly', 'operators', 'core'});
 exampleDir = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 dataDir = fullfile(exampleDir, 'data');
 oldDir = pwd;
@@ -14,7 +15,7 @@ cd(dataDir);
 Example = 'Example_3';
 Refinement = 7;
 t = 1;
-Nc = 30;
+Nc = 40;
 n_eigenvalues = 1;
 
 beta = 20;
@@ -57,6 +58,7 @@ runDir = fullfile(resultRoot, sprintf('refine_%02d', Refinement), ...
     sprintf('p_%d', pdeg), sprintf('Nc_%02d', Nc));
 if ~exist(runDir, 'dir'), mkdir(runDir); end
 
+% Load a complete reference run when it is available.
 runMat = fullfile(runDir, 'run.mat');
 if exist(runMat, 'file')
     S = load(runMat, 'run');
@@ -67,6 +69,7 @@ if exist(runMat, 'file')
     return;
 end
 
+% Solve and save the reference case.
 opts = struct();
 opts.Example = Example;
 opts.beta = beta;

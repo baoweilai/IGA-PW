@@ -1,5 +1,5 @@
 function errDG = dg_error(referenceRunFile, caseRunFile, opt)
-%Compute the DG energy error.
+% Compute the DG energy error.
 arguments
     referenceRunFile
     caseRunFile
@@ -21,7 +21,7 @@ errDG = sqrt(max(real(innerErr + outerErr + sigma * jumpErr), 0));
 end
 
 function R = unpack_run_local(run, runFile)
-%Extract fields from a saved run structure.
+% Extract fields from a saved run structure.
 if ~isfield(run, 'uh') || isempty(run.uh)
     error('The run file must contain saved eigenvectors: run.uh. Missing in: %s', runFile);
 end
@@ -36,7 +36,7 @@ R.a = run.meta.a;
 end
 
 function C = align_phase_local(R, C)
-%Align phase.
+% Align coefficient columns with their reference modes.
 [~, ia, ib] = intersect(R.k, C.k, 'rows');
 alpha = sum(conj(R.cP(ia)) .* C.cP(ib));
 if abs(alpha) > 0
@@ -47,7 +47,7 @@ end
 end
 
 function [val, hPhys] = inner_iga_error_local(R, C, n)
-%Integrate the IGA-region DG error.
+% Integrate the IGA-region DG error.
 [X, Y, Z, w] = cube_points_local(-R.a, R.a, n);
 [vR, gxR, gyR, gzR] = iga_val_grad_local(R.nurbs, R.cI, X, Y, Z, R.a);
 [vC, gxC, gyC, gzC] = iga_val_grad_local(C.nurbs, C.cI, X, Y, Z, C.a);
@@ -57,7 +57,7 @@ hPhys = estimate_h_local(C.nurbs, C.a);
 end
 
 function val = outer_pw_error_local(R, C, nBase)
-%Integrate the plane-wave-region DG error.
+% Integrate the plane-wave-region DG error.
 m = max([nBase, 2 * max(abs(R.k(:))) + 1, 2 * max(abs(C.k(:))) + 1, 8]);
 [vR, gxR, gyR, gzR, xmid] = pw_grid_grad_local(R, m);
 [vC, gxC, gyC, gzC] = pw_grid_grad_local(C, m);
@@ -69,7 +69,7 @@ val = sum(abs(vC(mask) - vR(mask)).^2 + abs(gxC(mask) - gxR(mask)).^2 + ...
 end
 
 function val = face_jump_error_local(R, C, n, chunkSize)
-%Integrate the interface jump error.
+% Integrate the interface jump error.
 [X, Y, Z, w] = face_points_local(R.a, n);
 [pR, ~, ~, ~] = pw_points_grad_local(R.cP, R.k, X, Y, Z, R.L, chunkSize);
 [pC, ~, ~, ~] = pw_points_grad_local(C.cP, C.k, X, Y, Z, C.L, chunkSize);
@@ -79,7 +79,7 @@ val = sum(abs((pC - pR) - (iC - iR)).^2) * w;
 end
 
 function [X, Y, Z, w] = cube_points_local(xmin, xmax, n)
-%Create midpoint quadrature points in a cube.
+% Create midpoint quadrature points in a cube.
 dx = (xmax - xmin) / n;
 x = (xmin + dx / 2 : dx : xmax - dx / 2).';
 [X, Y, Z] = ndgrid(x, x, x);
@@ -88,7 +88,7 @@ w = dx ^ 3;
 end
 
 function [X, Y, Z, w] = face_points_local(a, n)
-%Create midpoint quadrature points on cube faces.
+% Create midpoint quadrature points on cube faces.
 ds = 2 * a / n;
 t = (-a + ds / 2 : ds : a - ds / 2).';
 [A, B] = ndgrid(t, t);
@@ -100,7 +100,7 @@ w = ds ^ 2;
 end
 
 function [u, gx, gy, gz, xmid] = pw_grid_grad_local(R, m)
-%Evaluate a plane-wave field and gradient on a grid.
+% Evaluate a plane-wave field and gradient on a grid.
 raw = zeros(m, m, m);
 rawX = raw; rawY = raw; rawZ = raw;
 idx = sub2ind([m, m, m], mod(R.k(:, 1), m) + 1, mod(R.k(:, 2), m) + 1, mod(R.k(:, 3), m) + 1);
@@ -120,7 +120,7 @@ xmid = (-R.L / 2 + dx / 2 : dx : R.L / 2 - dx / 2).';
 end
 
 function [v, gx, gy, gz] = pw_points_grad_local(c, k, X, Y, Z, L, chunkSize)
-%Evaluate a plane-wave field and gradient at points.
+% Evaluate a plane-wave field and gradient at points.
 v = zeros(numel(X), 1); gx = v; gy = v; gz = v;
 fac = 1i * 2 * pi / L;
 scale = 1 / sqrt(L ^ 3);
@@ -136,7 +136,7 @@ end
 end
 
 function [v, gx, gy, gz] = iga_val_grad_local(nurbs, c, X, Y, Z, a)
-%Evaluate the IGA field and gradient at points.
+% Evaluate the IGA field and gradient at points.
 U = nurbs.Ubar; V = nurbs.Vbar; W = nurbs.Wbar;
 pu = nurbs.pu; pv = nurbs.pv; pw = nurbs.pw;
 m = nurbs.m; nn = nurbs.n;
@@ -166,7 +166,7 @@ end
 end
 
 function h = estimate_h_local(nurbs, a)
-%Estimate the physical mesh size.
+% Estimate the physical mesh size.
 h = 2 * a * max([max(diff(unique(nurbs.Ubar))), ...
     max(diff(unique(nurbs.Vbar))), max(diff(unique(nurbs.Wbar)))]);
 end

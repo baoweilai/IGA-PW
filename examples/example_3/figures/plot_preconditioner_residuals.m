@@ -1,6 +1,7 @@
 function plot_preconditioner_residuals()
-%Replot Example 3 residual histories.
+% Plot Example 3 residual histories.
 
+% Resolve data paths and initialize the figure style.
 close all; clc;
 
 exampleDir = fileparts(fileparts(mfilename('fullpath')));
@@ -16,6 +17,7 @@ set(groot, ...
     'defaultLegendInterpreter', 'latex', ...
     'defaultAxesTickLabelInterpreter', 'latex');
 
+% Load residual histories for all displayed methods and degrees.
 none = readtable(fullfile(dataRoot, 'p1_refine05', 'none', ...
     'solver_history_last_scf_refine_05_none.csv'), 'TextType', 'string');
 jacobi = readtable(fullfile(dataRoot, 'p1_refine05', 'purediag', ...
@@ -26,6 +28,7 @@ tb1 = readtable(fullfile(dataRoot, 'p1_refine05', 'interfaceblock', ...
 [x2, r2] = load_tb_history(fullfile(dataRoot, 'p_02', 'interfaceblock', 'run.mat'));
 [x3, r3] = load_tb_history(fullfile(dataRoot, 'p_03', 'interfaceblock', 'run.mat'));
 
+% Create the axes and draw every residual curve.
 fig = figure('Color', cfg.fig.bgColor, ...
     'Units', 'inches', ...
     'Position', [1 1 cfg.fig.width cfg.fig.height], ...
@@ -47,6 +50,7 @@ plot(ax, x2, r2, '-', ...
 plot(ax, x3, r3, '-', ...
     'Color', extraColors(2, :), 'LineWidth', cfg.line.width);
 
+% Apply logarithmic residual scaling and export the PDF.
 set(ax, ...
     'XScale', 'linear', ...
     'YScale', 'log', ...
@@ -70,12 +74,11 @@ legend(ax, ...
     'Interpreter', 'latex');
 
 export_figure(fig, fullfile(outDir, 'Residuals_Nc=20_refine=5'), cfg);
-print(fig, fullfile(outDir, 'Residuals_Nc=20_refine=5.png'), '-dpng', '-r600');
 close(fig);
 end
 
 function [x, r] = load_tb_history(runMat)
-%Read the last SCF solver history.
+% Read the last SCF solver history.
 
 S = load(runMat, 'run');
 assert(isfield(S, 'run'), 'Missing run structure in %s.', runMat);
@@ -85,7 +88,7 @@ r = hist(:, 6);
 end
 
 function export_figure(fig, baseName, cfg)
-%Save the final figure.
+% Save the final figure.
 
 set(fig, ...
     'PaperUnits', 'inches', ...
@@ -96,7 +99,7 @@ exportgraphics(fig, [baseName '.pdf'], 'ContentType', 'vector');
 end
 
 function cfg = default_style()
-%Return the original residual-figure style.
+% Return the fixed residual-figure style.
 
 cfg = struct();
 cfg.fig.width = 4.8;

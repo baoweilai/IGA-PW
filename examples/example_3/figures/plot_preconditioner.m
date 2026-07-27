@@ -1,6 +1,7 @@
 function summary = plot_preconditioner(runCfg)
-%Plot preconditioner comparison data.
+% Plot preconditioner comparison data.
 
+% Resolve workflow paths and merge the run configuration.
 clc; close all;
 
 assert(exist('runCfg', 'var') == 1, 'plot_preconditioner requires runCfg.');
@@ -8,7 +9,7 @@ assert(exist('runCfg', 'var') == 1, 'plot_preconditioner requires runCfg.');
 scriptDir = fileparts(mfilename('fullpath'));
 exampleDir = fileparts(scriptDir);
 activate_example_workflow('preconditioner', ...
-    {'nurbs', 'iga', 'assembly', 'operators', 'core', 'solver'});
+    {'nurbs', 'iga', 'assembly', 'operators', 'core'});
 
 defaultRunCfg = struct( ...
     'Nc', 20, ...
@@ -34,6 +35,7 @@ t = pdeg - 1;
 refineList = unique(max(1, round(runCfg.refine_list(:).')), 'stable');
 nEigenvalues = max(1, round(runCfg.n_eigenvalues));
 
+% Create result and cache directories for the comparison.
 resultRoot = fullfile(exampleDir, 'data', 'preconditioner');
 if ~exist(resultRoot, 'dir'), mkdir(resultRoot); end
 
@@ -51,12 +53,14 @@ solveModes = {'none', 'purediag', 'interfaceblock'};
 methodPrefixes = {'none', 'pd', 'ib'};
 methodLabels = {'Unpreconditioned', 'Jacobi', 'TB-DG'};
 
+% Report the fixed discretization and solver settings.
 fprintf('\n============================================================\n');
 fprintf('[RUN ] Example 3 SCF preconditioner comparison\n');
 fprintf('[INFO] Nc = %d, p = %d, refine = %s\n', Nc, pdeg, mat2str(refineList));
 fprintf('[INFO] PW inner correction = Chebyshev, NURBS = square-fast Gauss, DG = square-fast\n');
 fprintf('[INFO] output = %s\n', outDir);
 
+% Run or load every refinement and preconditioner case.
 rows = struct([]);
 for ir = 1:numel(refineList)
     refine = refineList(ir);
@@ -109,6 +113,7 @@ for ir = 1:numel(refineList)
     end
 end
 
+% Save the summary table and export the two comparison PDFs.
 summary = struct2table(rows);
 summaryCsv = fullfile(outDir, 'summary.csv');
 writetable(summary, summaryCsv);
@@ -124,7 +129,7 @@ fprintf('[SAVED] %s\n', fullfile(plotDir, 'condition.pdf'));
 end
 
 function opts = make_common_opts_local(runCfg, nEigenvalues, cachePwRoot, cacheNurbsRoot)
-%Build common opts.
+% Build solver options shared by all preconditioner cases.
 opts = struct();
 opts.Example = 'Example_3';
 opts.beta = runCfg.beta;
@@ -145,11 +150,6 @@ opts.eps_diag = 1e-12;
 opts.iface_reg = 1e-12;
 opts.rng_seed = runCfg.rng_seed;
 opts.snapshot_iters = [];
-opts.save_eigenvectors = false;
-opts.save_nurbs = false;
-opts.save_pw_index = false;
-opts.save_matrices = false;
-opts.save_mat = false;
 opts.use_pw_cache = true;
 opts.use_nurbs_cache = true;
 opts.cacheRoot = cachePwRoot;
@@ -158,11 +158,10 @@ opts.prec_cond_max_n = runCfg.cond_max_n;
 opts.inner_cheb_n = 80;
 opts.pw_fft_grid_n = 128;
 opts.use_square_nurbs_fast = true;
-opts.use_square_dg_fast = true;
 end
 
 function [loaded, result, meta] = load_optimized_case_local(runMat)
-%Load optimized case.
+% Load one completed preconditioner run.
 loaded = false;
 result = struct();
 meta = struct();
@@ -181,7 +180,7 @@ loaded = true;
 end
 
 function condCtx = build_condition_context_local(scriptDir, nElem, t, Nc, opts)
-%Build condition context.
+% Assemble operators needed for condition-number evaluation.
 L = 4;
 a = 0.2;
 innerDomains = [-a, a, -a, a];
@@ -224,15 +223,7 @@ M(1:nDofsNurbs, 1:nDofsNurbs) = Mnurbs;
 M(pwDofs, pwDofs) = Mpw;
 M = 0.5 * (M + M');
 
-if opts.use_square_dg_fast
-    P = assemble_DG_square_interface_fast(nurbs_refine, kPw, pwDofs, L, a, nTotal);
-else
-    [PBottom, ~] = IGA_DG_Bottom_Edge_Assemble(nurbs_original, nurbs_refine, kPw, pwDofs, L, nTotal);
-    [PTop,    ~] = IGA_DG_Top_Edge_Assemble(nurbs_original, nurbs_refine, kPw, pwDofs, L, nTotal);
-    [PLeft,   ~] = IGA_DG_Left_Edge_Assemble(nurbs_original, nurbs_refine, kPw, pwDofs, L, nTotal);
-    [PRight,  ~] = IGA_DG_Right_Edge_Assemble(nurbs_original, nurbs_refine, kPw, pwDofs, L, nTotal);
-    P = PBottom + PTop + PLeft + PRight;
-end
+P = assemble_DG_square_interface_fast(nurbs_refine, kPw, pwDofs, L, a, nTotal);
 P = sparse(P);
 gamma = find(sum(abs(P), 2) ~= 0);
 eta = setdiff((1:nTotal).', gamma);
@@ -246,7 +237,7 @@ condCtx.script_dir = scriptDir;
 end
 
 function [result, meta] = recompute_shifted_condition_local(result, meta, condCtx, opts, solveMode)
-%Compute shifted condition.
+% Compute the shifted condition estimate for one solver mode.
 tau = double(opts.block_targetShift);
 epsD = double(opts.eps_diag);
 maxN = double(opts.prec_cond_max_n);
@@ -266,7 +257,7 @@ result.cond = kappa;
 end
 
 function update_cached_run_condition_local(runMat, result, meta)
-%Update cached run condition.
+% Save the computed condition estimate in the cached run.
 assert(exist(runMat, 'file') == 2, 'Missing cached run file: %s', runMat);
 S = load(runMat, 'run');
 assert(isfield(S, 'run'), 'Cached run file does not contain run: %s', runMat);
@@ -277,7 +268,7 @@ save(runMat, 'run', '-v7.3');
 end
 
 function [Pmat, delta] = build_condition_preconditioner_matrix_local(A_tau, condCtx, solveMode, epsD)
-%Build condition preconditioner matrix.
+% Build the selected preconditioner matrix for condition analysis.
 n = size(A_tau, 1);
 solveMode = lower(string(solveMode));
 delta = 0;
@@ -311,7 +302,7 @@ Pmat = 0.5 * (Pmat + Pmat');
 end
 
 function [delta, AgShifted] = make_block_positive_definite_local(Ag, epsD)
-%Build block positive definite.
+% Shift the interface block until it is positive definite.
 n = size(Ag, 1);
 if n == 0
     delta = 0;
@@ -344,7 +335,7 @@ error('TB-DG gamma block is not numerically positive definite after delta regula
 end
 
 function [kappa, sigmaMax, sigmaMin] = shifted_generalized_abs_condition_local(A, B, maxN, label, opts)
-%Compute generalized abs condition.
+% Compute the absolute generalized condition number of the shifted system.
 n = size(A, 1);
 assert(n <= maxN, '%s: matrix size %d exceeds max_n = %g.', label, n, maxN);
 
@@ -374,7 +365,7 @@ end
 
 function [Hnurbs, Mnurbs] = get_nurbs_matrices_for_condition_local( ...
 nurbs_original, nurbs_refine, nElem, t, kVr, nPwVr, L, nGp, opts)
-%Return NURBS matrices for condition.
+% Load or assemble NURBS matrices for condition analysis.
 useFast = logical(opts.use_square_nurbs_fast);
 exampleName = opts.Example;
 cacheFile = fullfile(opts.cacheNurbsRoot, ...
@@ -400,7 +391,7 @@ end
 
 function [Hpw, Mpw] = get_pw_matrices_for_condition_local( ...
 L, Nc, innerDomains, kVr, nPwVr, opts)
-%Return PW matrices for condition.
+% Load or assemble plane-wave matrices for condition analysis.
 innerChebN = opts.inner_cheb_n;
 fftGridN = opts.pw_fft_grid_n;
 exampleName = opts.Example;
@@ -425,7 +416,7 @@ end
 end
 
 function [kList, nBasis] = build_pw_disk_local(Nc)
-%Build PW disk.
+% Build the circular plane-wave index set.
 N = floor(Nc);
 kList = zeros((2 * N + 1)^2, 2);
 nBasis = 0;
@@ -440,13 +431,13 @@ kList = kList(1:nBasis, :);
 end
 
 function row = add_method_result_local(row, prefix, result)
-%Store only values used by the manuscript plots.
+% Store only values used by the manuscript plots.
 row.([prefix '_solver_time_s']) = result.time_total;
 row.([prefix '_cond']) = result.cond;
 end
 
 function plot_preconditioner_summary_local(summary, prefixes, labels, plotDir)
-%Plot preconditioner summary.
+% Plot preconditioner summary.
 cfg = default_style_local();
 set(groot, ...
     'defaultTextInterpreter', 'latex', ...
@@ -497,7 +488,7 @@ close(fig2);
 end
 
 function M = extract_metric_matrix_local(summary, prefixes, suffix, order)
-%Extract metric matrix.
+% Extract one ordered metric matrix from the summary structure.
 M = zeros(numel(order), numel(prefixes));
 for k = 1:numel(prefixes)
     M(:, k) = summary.([prefixes{k} suffix])(order);
@@ -506,13 +497,13 @@ assert(all(isfinite(M(:)) & M(:) > 0), 'Summary data must be finite and positive
 end
 
 function plot_metric_panel_local(ax, x, Y, labels, cfg, xlabelStr, ylabelStr)
-%Plot metric panel.
+% Plot metric panel.
 X = repmat(x(:), 1, numel(labels));
 plot_xy_metric_panel_local(ax, X, Y, labels, cfg, xlabelStr, ylabelStr);
 end
 
 function plot_xy_metric_panel_local(ax, X, Y, labels, cfg, xlabelStr, ylabelStr)
-%Plot xy metric panel.
+% Plot one metric against another for all solver variants.
 hold(ax, 'on');
 for k = 1:numel(labels)
     xk = X(:, k);
@@ -535,7 +526,7 @@ ylabel(ax, ylabelStr, 'Interpreter', 'latex', 'FontSize', cfg.axes.labelSize);
 end
 
 function apply_axis_padding_local(ax, x, Y, cfg)
-%Add padding to axis limits.
+% Add padding to axis limits.
 x = x(:);
 y = Y(:);
 assert(all(isfinite(x) & x > 0), 'X data for axis padding must be finite and positive.');
@@ -549,7 +540,7 @@ ylim(ax, 10 .^ [ly(1) - cfg.axes.ypad * dy, ly(2) + cfg.axes.ypad * dy]);
 end
 
 function set_axes_style_local(ax, cfg)
-%Apply axes style settings.
+% Apply axes style settings.
 set(ax, ...
     'FontSize', cfg.axes.fontSize, ...
     'LineWidth', cfg.axes.lineWidth, ...
@@ -572,7 +563,7 @@ grid(ax, 'off');
 end
 
 function export_figure_local(fig, baseName, cfg)
-%Export figure.
+% Export the figure as a PDF.
 set(fig, ...
     'PaperUnits', 'inches', ...
     'PaperPosition', [0 0 cfg.fig.width cfg.fig.height], ...
@@ -582,7 +573,7 @@ exportgraphics(fig, [baseName '.pdf'], 'ContentType', 'vector');
 end
 
 function cfg = default_style_local()
-%Return plotting style values.
+% Return plotting style values.
 cfg = struct();
 cfg.fig.width = 4.8;
 cfg.fig.height = 3.0;
@@ -613,7 +604,7 @@ cfg.line.markerSize = 8;
 end
 
 function delete_extra_figures_local(plotDir)
-%Close figures that are not needed.
+% Close figures that are not needed.
 keep = {'time.pdf', 'condition.pdf'};
 files = dir(fullfile(plotDir, '*'));
 for k = 1:numel(files)
@@ -627,7 +618,7 @@ end
 end
 
 function cfg = merge_run_config_local(defaultCfg, userCfg)
-%Merge run config.
+% Merge user configuration fields into the run defaults.
 cfg = defaultCfg;
 assert(isstruct(userCfg), 'Run configuration must be a structure.');
 names = fieldnames(userCfg);

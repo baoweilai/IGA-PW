@@ -1,5 +1,6 @@
 function [W,DW, D2W,F,DF,D2F]=NurbsSurfaceDers(ConPts,knotU,knotV,weights,pu,u,pv,v)
-%Evaluate NURBS surface derivatives.
+% Evaluate NURBS surface derivatives.
+% Evaluate the one-dimensional basis derivatives and active control net.
 Uders=bspbasisDers(knotU,pu,u,2);
 Nu=Uders(1,:);
 DNu=Uders(2,:);
@@ -26,6 +27,7 @@ DIM=2;
 F=zeros(DIM,1);
 
 
+% Compute the rational weight, surface point, and weight derivatives.
 W = Nu * w_ij * Nv;
 DW=zeros(1,DIM);
 DW(1) = DNu*w_ij*Nv;
@@ -43,6 +45,7 @@ W2 = W*W;
 W4 = W2*W2;
 
 
+% Form the surface Jacobian from rational basis derivatives.
 R_DNu = (DNu*W-Nu*DW(1))/W2;
 R_DNv = (DNv*W-Nv*DW(2))/W2;
 
@@ -57,6 +60,7 @@ DF(2,2) = Nu *(P_v.*w_ij)*R_DNv;
 D2F=zeros(DIM,DIM,DIM);
 
 
+% Form the surface Hessian and mixed derivatives.
 R_D2Nu =  ( (D2Nu*W-Nu*D2W(1,1))*W2-(DNu*W-Nu*DW(1))*2*W*DW(1) )/W4;
 R_D2Nv =  ( (D2Nv*W-Nv*D2W(2,2))*W2-(DNv*W-Nv*DW(2))*2*W*DW(2) )/W4;
 R_D2Nuv=  ( (DNu*DW(2) - Nu*D2W(1,2) )*W2- (DNu*W - Nu*DW(1))*2*W*DW(2) )/W4;

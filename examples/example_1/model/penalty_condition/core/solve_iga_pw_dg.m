@@ -1,8 +1,9 @@
 function [result, n_dofs_total, meta] = solve_iga_pw_dg(Refinement, t, Nc, n_eigenvalues, opts)
-%Solve the Example 1 IGA-PW-DG problem.
+% Solve the Example 1 IGA-PW-DG problem.
 
 format long;
 
+% Read the discretization settings and selected preconditioner variants.
 beta = opts.beta;
 lambda_ref = opts.lambda_ref;
 tau_shift = opts.tau_shift;
@@ -18,28 +19,12 @@ run_none = any(strcmpi(enabled_variants, 'None'));
 run_blockdiag = any(strcmpi(enabled_variants, 'BlockDiag'));
 run_interface = any(strcmpi(enabled_variants, 'InterfaceBlock'));
 
-nu = 2;
-nv = 2;
-ConPts = zeros(nu, nv, 2);
-x = [-a, a];
-y = [-a, a];
-ConPts(:, :, 1) = [x(1) x(1); x(2) x(2)];
-ConPts(:, :, 2) = [y(1) y(2); y(1) y(2)];
-
-weights = [1 1; 1 1];
+% Build the inner NURBS patch and plane-wave bases.
 knotU = [0 0 1 1];
 knotV = [0 0 1 1];
 
 pu0 = 1;
 pv0 = 1;
-nurbs_original = struct();
-nurbs_original.ConPts = ConPts;
-nurbs_original.weights = weights;
-nurbs_original.pu = pu0;
-nurbs_original.pv = pv0;
-nurbs_original.knotU = knotU;
-nurbs_original.knotV = knotV;
-
 [knotUe, knotVe] = IGADegreeElevSurface(knotU, knotV, t);
 pu = pu0 + t;
 pv = pv0 + t;
@@ -57,14 +42,14 @@ N_Vr = 2;
 
 idxI = 1:n_dofs_nurbs;
 idxP = pw_dofs_indices;
-use_square_dg_fast = logical(opts.use_square_dg_fast);
 
 H = sparse(n_dofs_total, n_dofs_total);
 M = sparse(n_dofs_total, n_dofs_total);
 
+% Assemble the uncoupled NURBS and plane-wave volume blocks.
 t_nurbs = tic;
-[H_nurbs, M_nurbs, nurbs_build_meta] = generate_A_M_NURBS_2D( ...
-    nurbs_original, nurbs_refine, k_Vr, n_pw_Vr, L, opts.n_gp, opts.Example, opts);
+[H_nurbs, M_nurbs] = generate_A_M_NURBS_2D( ...
+    nurbs_refine, k_Vr, L, opts.n_gp, a);
 time_nurbs_build = toc(t_nurbs);
 
 H(idxI, idxI) = H_nurbs;
@@ -78,27 +63,13 @@ time_pw_build = toc(t_pw);
 H(idxP, idxP) = H_pw;
 M(idxP, idxP) = M_pw;
 
+% Assemble the DG interface terms and shifted eigenproblem.
 t_dg = tic;
-p = k_pw;
-if use_square_dg_fast
-    [P, S, dg_fast_meta] = assemble_DG_square_interface_fast( ...
-        nurbs_refine, p, pw_dofs_indices, L, a, n_dofs_total);
-    dg_assembly_method = 'square_fast';
-else
-    [P_Bottom, S_Bottom] = IGA_DG_Bottom_Edge_Assemble( ...
-        nurbs_original, nurbs_refine, p, pw_dofs_indices, L, n_dofs_total);
-    [P_Top, S_Top] = IGA_DG_Top_Edge_Assemble( ...
-        nurbs_original, nurbs_refine, p, pw_dofs_indices, L, n_dofs_total);
-    [P_Left, S_Left] = IGA_DG_Left_Edge_Assemble( ...
-        nurbs_original, nurbs_refine, p, pw_dofs_indices, L, n_dofs_total);
-    [P_Right, S_Right] = IGA_DG_Right_Edge_Assemble( ...
-        nurbs_original, nurbs_refine, p, pw_dofs_indices, L, n_dofs_total);
-    P = P_Bottom + P_Top + P_Left + P_Right;
-    S = S_Bottom + S_Top + S_Left + S_Right;
-    dg_fast_meta = struct();
-    dg_assembly_method = 'legacy_edge_loops';
-end
+[P, S] = assemble_DG_square_interface_fast( ...
+    nurbs_refine, k_pw, pw_dofs_indices, L, a, n_dofs_total);
+time_dg_assembly = toc(t_dg);
 
+t_mat = tic;
 sigma = beta * (1 / h + Nc);
 diagP = full(diag(P));
 
@@ -106,11 +77,12 @@ Mat = H - 0.5 * S - 0.5 * S' + sigma * P;
 Mat = 0.5 * (Mat + Mat');
 M = 0.5 * (M + M');
 Atau = Mat - tau_shift * M;
-time_dg_assembly = toc(t_dg);
+time_matrix = toc(t_mat);
 
-time_shared_core = time_nurbs_build + time_pw_build + time_dg_assembly;
+time_shared_core = time_nurbs_build + time_pw_build + time_dg_assembly + time_matrix;
 time_shared_build = time_shared_core;
 
+% Package assembly data and configure the eigensolver.
 meta = struct();
 meta.Refinement = Refinement;
 meta.Nc = Nc;
@@ -125,14 +97,12 @@ meta.n_pw_basis = n_pw_basis;
 meta.time_nurbs_build = time_nurbs_build;
 meta.time_pw_build = time_pw_build;
 meta.time_dg_assembly = time_dg_assembly;
+meta.time_matrix = time_matrix;
 meta.time_shared_core = time_shared_core;
 meta.time_shared_build = time_shared_build;
 meta.enabled_variants = enabled_variants;
-meta.use_square_dg_fast = use_square_dg_fast;
-meta.dg_assembly_method = dg_assembly_method;
-meta.dg_fast_meta = dg_fast_meta;
-meta.nurbs_assembly_method = nurbs_build_meta.method;
-meta.nurbs_build_meta = nurbs_build_meta;
+meta.dg_assembly_method = 'square_fast';
+meta.nurbs_assembly_method = 'square_fast';
 meta.pw_timing = pw_timing;
 meta.pw_cache = pw_cache;
 
@@ -157,6 +127,7 @@ fprintf('[PRIMME] shared v0 seed             = %d\n', seed);
 
 result = struct();
 
+% Solve each selected preconditioner variant.
 if run_none
     fprintf('\n---------------- No preconditioner (PRIMME) ----------------\n');
 
@@ -243,6 +214,7 @@ end
 
 meta.time_total = time_shared_build + sum_variant_times_local(result);
 
+% Save the retained variant results and optional operators.
 if isfield(opts, 'outDir') && ~isempty(opts.outDir)
     if ~exist(opts.outDir, 'dir')
         mkdir(opts.outDir);
@@ -266,15 +238,6 @@ if isfield(opts, 'outDir') && ~isempty(opts.outDir)
         run.S = S;
     end
 
-    if isfield(opts, 'save_pw_index') && opts.save_pw_index
-        run.k_pw = k_pw;
-    end
-
-    if isfield(opts, 'save_nurbs') && opts.save_nurbs
-        run.nurbs_original = nurbs_original;
-        run.nurbs_refine = nurbs_refine;
-    end
-
     if isfield(opts, 'save_eigenvectors') && opts.save_eigenvectors
         save(fullfile(opts.outDir, 'run.mat'), 'run', '-v7.3');
     else
@@ -285,7 +248,7 @@ end
 
 function [bd, time_build_prec] = build_blockdiag_data_local( ...
     Atau, H_pw, M_pw, sigma, tau_shift, diagP, idxI, idxP, eps_diag)
-%Build block-diagonal preconditioner data.
+% Build block-diagonal preconditioner data.
 t_build = tic;
 
 dII = abs(diag(Atau(idxI, idxI)));
@@ -309,7 +272,7 @@ function [bd, ifb, time_build_prec] = ...
     build_interface_block_prec_data_local( ...
     Atau, P, H_pw, M_pw, sigma, tau_shift, diagP, idxI, idxP, ...
     eps_diag, iface_reg)
-%Build interface-block preconditioner data.
+% Build interface-block preconditioner data.
 [bd, time_build_bd] = build_blockdiag_data_local( ...
     Atau, H_pw, M_pw, sigma, tau_shift, diagP, idxI, idxP, eps_diag);
 
@@ -331,12 +294,7 @@ time_build_prec = time_build_bd + toc(t_build);
 end
 
 function variants = get_enabled_variants_local(opts)
-%Return enabled variants.
-if logical(opts.interface_only)
-    variants = {'InterfaceBlock'};
-    return;
-end
-
+% Collect the enabled penalty solver variants.
 variants = opts.enabled_variants;
 
 if ischar(variants) || isstring(variants)
@@ -352,7 +310,7 @@ variants = valid(mask);
 end
 
 function total = sum_variant_times_local(result)
-%Compute variant times.
+% Sum the recorded timing components for one solver variant.
 total = 0;
 fn = fieldnames(result);
 for i = 1:numel(fn)
@@ -364,7 +322,7 @@ end
 end
 
 function [k_list, n_basis] = build_pw_disk_local(Nc)
-%Build PW disk.
+% Build the circular plane-wave index set.
 N = floor(Nc);
 k_list = zeros((2 * N + 1) ^ 2, 2);
 n_basis = 0;
@@ -380,7 +338,7 @@ end
 
 function [H_pw, M_pw, pw_timing, cache_meta] = get_pw_matrices_cached( ...
     L, Nc, inner_domains_coordinates, k_Vr, n_pw_Vr, opts)
-%Load or assemble cached plane-wave matrices.
+% Load or assemble cached plane-wave matrices.
 cache_ok = isfield(opts, 'use_pw_cache') && opts.use_pw_cache ...
     && isfield(opts, 'cacheRoot') && ~isempty(opts.cacheRoot);
 
@@ -429,7 +387,7 @@ end
 end
 
 function key = build_pw_cache_key_local(L, Nc, n_pw_Vr, opts, version)
-%Build PW cache key.
+% Build a cache key from the plane-wave discretization settings.
 inner_cheb_n = opts.inner_cheb_n;
 fft_grid_n = opts.pw_fft_grid_n;
 
@@ -438,13 +396,13 @@ key = sprintf('%s_L_%s_Nc_%d_NVr_%d_cheb_%d_fft_%d', ...
 end
 
 function txt = sanitize_number_local(x)
-%Convert a numeric value to a path tag.
+% Convert a numeric value to a path tag.
 txt = strrep(num2str(x, '%.6g'), '.', 'p');
 txt = strrep(txt, '-', 'm');
 end
 
 function out = merge_struct_local(base, override)
-%Merge struct.
+% Merge override fields into the base structure.
 out = base;
 if ~isstruct(override)
     return;
@@ -457,19 +415,19 @@ end
 end
 
 function y = apply_blockdiag_prec_local(x, bd)
-%Apply blockdiag prec.
+% Apply the stored block-diagonal preconditioner.
 y = bsxfun(@times, x, bd.dinv);
 end
 
 function y = apply_interface_block_prec_local(x, bd, ifb)
-%Apply the interface-block preconditioner.
+% Apply the interface-block preconditioner.
 y = apply_blockdiag_prec_local(x, bd);
 y(ifb.gamma, :) = ifb.solve \ x(ifb.gamma, :);
 end
 
 function [uh, D, rnorms, stats] = call_primme_noprec_local( ...
     Mat, M, n_eigs, target, ops, method)
-%Call PRIMME without a preconditioner.
+% Call PRIMME without a preconditioner.
 if ~isempty(method)
     [uh, D, rnorms, stats] = primme_eigs(Mat, M, n_eigs, target, ops, method);
 else
@@ -479,7 +437,7 @@ end
 
 function [uh, D, rnorms, stats] = call_primme_with_prec_local( ...
     Mat, M, n_eigs, target, ops, method, precfun)
-%Call PRIMME with a preconditioner.
+% Call PRIMME with a preconditioner.
 if ~isempty(method)
     [uh, D, rnorms, stats] = primme_eigs(Mat, M, n_eigs, target, ops, method, precfun);
 else
@@ -489,7 +447,7 @@ end
 
 function [lambda, uh] = postprocess_eigs_local( ...
     uh, D, M, n_eigenvalues, n_dofs_nurbs, k_pw)
-%Sort and normalize eigenpairs.
+% Sort and normalize eigenpairs.
 lambda = diag(D);
 [lambda, perm] = sort(real(lambda), 'ascend');
 uh = uh(:, perm);
@@ -527,7 +485,7 @@ end
 
 
 function s = string_or_empty_local(x)
-%Compute or empty.
+% Convert a value to text or return an empty string.
 if isempty(x)
     s = '';
 else
@@ -536,7 +494,7 @@ end
 end
 
 function s = target_to_string_local(x)
-%Compute to string.
+% Convert an eigenvalue target to text.
 if isnumeric(x)
     s = char(string(x));
 elseif isstring(x) || ischar(x)

@@ -1,13 +1,11 @@
 function [knotU,knotV,knotW] =  updateKnotVectors_3D(nurbs_original)
-%Update 3-D knot vectors after refinement.
+% Update 3-D knot vectors after refinement.
 
 knotU = nurbs_original.knotU;
 knotV = nurbs_original.knotV;
 knotW = nurbs_original.knotW;
 
-
-% nurbs_original.Lengths
-
+% Derive directional refinement counts from the patch lengths.
 a = nurbs_original.Lengths;
 
 dx = min(a);

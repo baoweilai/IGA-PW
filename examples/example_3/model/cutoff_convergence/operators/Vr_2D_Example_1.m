@@ -1,5 +1,5 @@
 function Vr = Vr_2D_Example_1(p, L, n_pw, x, y)
-%Evaluate the Example 1 radial potential.
+% Evaluate the Example 1 radial potential.
 
 % Ewald-type potential in 2D Example 1
 % Robust version: regularize the singular term near r = 0

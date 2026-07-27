@@ -6,7 +6,7 @@ nurbs_original, nurbs_refine, pw_index, plane_wave_dofs_index, L, n_dofs)
 
 DIM = 2;
 
-%% Original NURBS patch data
+%% Input NURBS patch data
 ConPts_o  = nurbs_original.ConPts;
 weights_o = nurbs_original.weights;
 knotU_o   = nurbs_original.knotU;
@@ -67,7 +67,7 @@ for e = 1:uNoEs
     for i = 1:n_gp
         u = ((b - a) * gp(i) + a + b) / 2;
 
-        % Geometry and Jacobian on the original patch
+% Geometry and Jacobian on the input patch
         [F, DF_plus] = NurbsSurface( ...
             ConPts_o, weights_o, knotU_o, pu_o, u, knotV_o, pv_o, v_top_inner);
 

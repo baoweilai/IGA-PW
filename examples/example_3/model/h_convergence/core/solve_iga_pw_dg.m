@@ -1,11 +1,12 @@
-function [lambda, n_dofs_total, meta] = solve_iga_pw_dg(nElem, t, Nc, ~, opts)
-%Solve the Example 3 IGA-PW-DG problem.
+function [lambda, n_dofs_total, meta, state] = solve_iga_pw_dg(nElem, t, Nc, ~, opts)
+% Solve the Example 3 IGA-PW-DG problem.
 
 format long;
 t_total = tic;
 
 beta = opts.beta;
 
+% Define the inner NURBS patch and the plane-wave bases.
 L = 4;
 a = 0.2;
 inner_domains_coordinates = [-a, a, -a, a];
@@ -20,13 +21,13 @@ ConPts(:,:,2) = [y(1) y(2); y(1) y(2)];
 weights = [1 1; 1 1];
 pu0 = 1; pv0 = 1;
 
-nurbs_original = struct();
-nurbs_original.ConPts  = ConPts;
-nurbs_original.weights = weights;
-nurbs_original.pu      = pu0;
-nurbs_original.pv      = pv0;
-nurbs_original.knotU   = [0 0 1 1];
-nurbs_original.knotV   = [0 0 1 1];
+nurbs_base = struct();
+nurbs_base.ConPts  = ConPts;
+nurbs_base.weights = weights;
+nurbs_base.pu      = pu0;
+nurbs_base.pv      = pv0;
+nurbs_base.knotU   = [0 0 1 1];
+nurbs_base.knotV   = [0 0 1 1];
 
 pu = pu0 + t;
 pv = pv0 + t;
@@ -42,6 +43,7 @@ n_dofs_total = n_dofs_nurbs + n_pw_basis;
 N_Vr = 1;
 [k_Vr, n_pw_Vr] = build_pw_disk(N_Vr);
 
+% Assemble the uncoupled NURBS and plane-wave blocks.
 H = sparse(n_dofs_total, n_dofs_total);
 M = sparse(n_dofs_total, n_dofs_total);
 
@@ -49,7 +51,7 @@ n_gp = opts.n_gp;
 
 t_nurbs = tic;
 [H_nurbs, M_nurbs] = get_nurbs_matrices_cached( ...
-    nurbs_original, nurbs_refine, nElem, t, k_Vr, n_pw_Vr, L, n_gp, opts);
+    nurbs_base, nurbs_refine, nElem, t, k_Vr, n_pw_Vr, L, n_gp, opts);
 time_nurbs = toc(t_nurbs);
 fprintf('[IGA] get_nurbs_matrices_cached time = %.4f s\n', time_nurbs);
 
@@ -66,13 +68,12 @@ M(pw_dofs_indices, pw_dofs_indices) = M_pw;
 
 p = k_pw;
 
-[P_Bottom, S_Bottom] = IGA_DG_Bottom_Edge_Assemble(nurbs_original, nurbs_refine, p, pw_dofs_indices, L, n_dofs_total);
-[P_Top,    S_Top   ] = IGA_DG_Top_Edge_Assemble   (nurbs_original, nurbs_refine, p, pw_dofs_indices, L, n_dofs_total);
-[P_Left,   S_Left  ] = IGA_DG_Left_Edge_Assemble  (nurbs_original, nurbs_refine, p, pw_dofs_indices, L, n_dofs_total);
-[P_Right,  S_Right ] = IGA_DG_Right_Edge_Assemble (nurbs_original, nurbs_refine, p, pw_dofs_indices, L, n_dofs_total);
-
-P = P_Bottom + P_Top + P_Left + P_Right;
-S = S_Bottom + S_Top + S_Left + S_Right;
+% Assemble the DG interface terms and static operator.
+t_dg = tic;
+[P, S, dg_fast_meta] = assemble_DG_square_interface_fast( ...
+    nurbs_refine, p, pw_dofs_indices, L, a, n_dofs_total);
+time_dg = toc(t_dg);
+fprintf('[DG ] assemble_DG_square_interface_fast time = %.4f s\n', time_dg);
 
 sigma = beta * (1 / h + Nc);
 
@@ -80,6 +81,7 @@ Mat0 = H - 0.5 * S - 0.5 * S' + sigma * P;
 Mat0 = 0.5 * (Mat0 + Mat0');
 M    = 0.5 * (M + M');
 
+% Solve the nonlinear ground-state problem.
 ops = struct();
 ops.tol         = opts.primme_tol;
 ops.maxit       = opts.primme_maxit;
@@ -89,11 +91,12 @@ targetShift     = opts.block_targetShift;
 
 [lambda1_scf, u1_scf, scfInfo] = solve_scf_groundstate( ...
     Mat0, M, P, n_dofs_nurbs, pw_dofs_indices, ...
-    nurbs_original, nurbs_refine, k_pw, L, a, Nc, n_gp, ...
+    nurbs_base, nurbs_refine, k_pw, L, a, Nc, n_gp, ...
     targetShift, ops, primme_method, opts);
 
 lambda = lambda1_scf;
 
+% Package the discretization, convergence, and timing data.
 meta = struct();
 meta.prec_type      = 'InterfaceBlock';
 meta.nElem          = nElem;
@@ -109,6 +112,9 @@ meta.n_dofs_nurbs   = n_dofs_nurbs;
 meta.n_pw_basis     = n_pw_basis;
 meta.time_nurbs     = time_nurbs;
 meta.time_pw        = time_pw;
+meta.time_dg        = time_dg;
+meta.dg_assembly_method = 'square_fast';
+meta.dg_fast_meta   = dg_fast_meta;
 
 meta.lambda1_scf    = lambda1_scf;
 meta.scf_iterations = scfInfo.n_iters;
@@ -121,6 +127,19 @@ meta.time_total     = toc(t_total);
 fprintf('[SCF-GS] lambda1 = %.12f, iters = %d, abslambda = %.3e, conv = %d\n', ...
     lambda1_scf, meta.scf_iterations, meta.scf_abslambda, meta.scf_converged);
 
+state = struct();
+state.lambda = lambda(:).';
+state.n_dofs_total = n_dofs_total;
+state.n_dofs_nurbs = n_dofs_nurbs;
+state.n_pw_basis = n_pw_basis;
+state.meta = meta;
+state.k_pw = k_pw;
+state.nurbs_base = nurbs_base;
+state.nurbs_refine = nurbs_refine;
+state.uh = u1_scf;
+state.u1_scf = u1_scf;
+
+% Save the retained eigenpair and optional operator data.
 if isfield(opts, 'outDir') && ~isempty(opts.outDir)
     if ~exist(opts.outDir, 'dir'), mkdir(opts.outDir); end
 
@@ -146,7 +165,7 @@ if isfield(opts, 'outDir') && ~isempty(opts.outDir)
     end
 
     if opts.save_nurbs
-        run.nurbs_original = nurbs_original;
+        run.nurbs_base     = nurbs_base;
         run.nurbs_refine   = nurbs_refine;
     end
 
@@ -161,7 +180,7 @@ end
 end
 
 function [k_list, n_basis] = build_pw_disk(Nc)
-%Build the plane-wave disk basis.
+% Build the plane-wave disk basis.
 N = floor(Nc);
 k_list = zeros((2*N+1)^2, 2);
 n_basis = 0;
@@ -176,7 +195,7 @@ k_list = k_list(1:n_basis,:);
 end
 
 function [H_nurbs, M_nurbs] = get_nurbs_matrices_cached( ...
-    nurbs_original, nurbs_refine, nElem, t, k_Vr, n_pw_Vr, L, n_gp, opts)
+    nurbs_base, nurbs_refine, nElem, t, k_Vr, n_pw_Vr, L, n_gp, opts)
 
 % Load or assemble cached NURBS matrices.
 
@@ -192,7 +211,7 @@ if opts.use_nurbs_cache && exist(cacheFile, 'file')
 end
 
 [H_nurbs, M_nurbs] = generate_A_M_NURBS_2D( ...
-    nurbs_original, nurbs_refine, k_Vr, n_pw_Vr, L, n_gp, opts.Example);
+    nurbs_base, nurbs_refine, k_Vr, n_pw_Vr, L, n_gp, opts.Example);
 
 if opts.use_nurbs_cache
     if ~exist(opts.cacheNurbsRoot, 'dir'), mkdir(opts.cacheNurbsRoot); end
@@ -201,7 +220,7 @@ end
 end
 
 function [H_pw, M_pw] = get_pw_matrices_cached(L, Nc, inner_domains_coordinates, k_Vr, n_pw_Vr, opts)
-%Load or assemble cached plane-wave matrices.
+% Load or assemble cached plane-wave matrices.
 cacheFile = fullfile(opts.cacheRoot, ...
     sprintf('PW_%s_L_%g_Nc_%d_NVr_%d_fft_%d_cheb_%d.mat', ...
     opts.Example, L, Nc, n_pw_Vr, opts.pw_fft_grid_n, opts.inner_cheb_n));

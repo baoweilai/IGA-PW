@@ -1,11 +1,9 @@
-﻿function out = run_cutoff_data(forceFlag, userCfg)
-%Generate cutoff-convergence data.
-assert(exist('forceFlag', 'var') == 1, 'run_cutoff_data requires forceFlag.');
-assert(exist('userCfg', 'var') == 1, 'run_cutoff_data requires userCfg.');
+﻿function out = run_cutoff_data()
+% Generate cutoff-convergence data.
 
+% Load the cutoff configuration and helper functions.
 activate_example_workflow('cutoff_convergence', {'config', 'core', 'operators', 'solver'});
-cfg = default_config(userCfg);
-cfg.force = logical(forceFlag);
+cfg = default_config(struct());
 H = example_helpers(cfg);
 pw = H.cfg.pw;
 
@@ -13,11 +11,13 @@ Nc_list = reshape(pw.Nc_list, 1, []);
 nCase = numel(Nc_list);
 lambda_list = zeros(1, nCase);
 
+% Run every retained plane-wave cutoff case.
 for i = 1:nCase
     caseOut = H.run_case('pw', pw.fixed_p, Nc_list(i), pw.fixed_Nelement);
     lambda_list(i) = caseOut.lambda;
 end
 
+% Compare with the reference and save the result.
 lambda_ref = H.cfg.reference_lambda;
 reference_run_file = H.case_run_file('reference', ...
     H.cfg.reference.p, H.cfg.reference.Nc, H.cfg.reference.Nelement);

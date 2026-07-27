@@ -1,6 +1,7 @@
 function [result, meta] = solve_full_domain(mode, cfg, opts)
-%Compute fulldomain singlemethod.
+% Solve one full-domain IGA or plane-wave problem.
 
+% Read the method, eigensolver, and reproducibility settings.
 format long;
 tWall = tic;
 
@@ -19,6 +20,7 @@ ops.reportLevel = get_opt_local(opts, 'primme_reportLevel', 0);
 seed = get_opt_local(opts, 'seed', 20260404);
 rng(seed, 'twister');
 
+% Assemble the selected full-domain matrix pair.
 tBuild = tic;
 switch mode
     case "pw"
@@ -39,6 +41,7 @@ end
 v0 = v0 / max(norm(v0), eps);
 ops.v0 = v0;
 
+% Solve and sort the generalized eigenpairs.
 target = get_opt_local(opts, 'primme_target', lambdaRef);
 method = get_opt_local(opts, 'primme_method', 'DEFAULT_MIN_MATVECS');
 
@@ -61,6 +64,7 @@ if mode == "iga" && isfield(staticMeta, 'full_to_reduced') && ~isempty(staticMet
     uh = expand_periodic_coeff_local(uhSolve, staticMeta.full_to_reduced);
 end
 
+% Package the eigenpairs, errors, and timings.
 meta = staticMeta;
 meta.mode = char(mode);
 meta.solve_mode = char(solveMode);
@@ -82,6 +86,7 @@ result.time_build_s = timeBuild;
 result.time_solve_s = timeSolve;
 result.time_wall_s = meta.time_wall_s;
 
+% Save the retained full-domain result.
 if isfield(opts, 'outDir') && ~isempty(opts.outDir)
     if ~exist(opts.outDir, 'dir'), mkdir(opts.outDir); end
     run = struct();
@@ -108,7 +113,7 @@ end
 end
 
 function [Mat, M, meta] = build_pw_problem_local(cfg, opts, L)
-%Build PW problem.
+% Assemble the full-domain plane-wave eigenproblem.
 Nc = cfg.Nc;
 Nvr = get_opt_local(opts, 'potential_Nc_pw', 2);
 sampleM = get_opt_local(opts, 'pw_potential_grid_m', 1024);
@@ -130,7 +135,8 @@ meta.cache_hit = cacheHit;
 end
 
 function [Mat, M, meta] = build_iga_problem_local(cfg, opts, L, Example)
-%Build IGA problem.
+% Build the full-domain IGA matrix pair.
+% Construct the elevated and refined rectangular patch.
 pdeg = cfg.pdeg;
 refine = cfg.refine;
 t = pdeg - 1;
@@ -163,6 +169,7 @@ else
     cacheFile = '';
 end
 
+% Load or assemble the NURBS matrices.
 if cacheOK && exist(cacheFile, 'file')
     S = load(cacheFile, 'Mat', 'M');
     Mat = S.Mat;
@@ -183,6 +190,8 @@ M = 0.5 * (M + M');
 
 usePeriodicBC = get_opt_local(opts, 'periodic_bc_iga', true);
 fullToReduced = [];
+
+% Apply periodic identification and package the mesh data.
 if usePeriodicBC
     [Mat, M, fullToReduced] = apply_periodic_reduction_local(Mat, M, nurbsRefine);
 end
@@ -203,7 +212,7 @@ end
 end
 
 function [Mat, M, kPw, cacheHit] = get_full_pw_matrices_cached_local(L, Nc, pVr, nVr, sampleM, opts)
-%Return full PW matrices cached.
+% Load or assemble cached full-domain plane-wave matrices.
 cacheOK = get_opt_local(opts, 'use_pw_cache', true) ...
     && isfield(opts, 'cacheRoot') && ~isempty(opts.cacheRoot);
 
@@ -254,7 +263,7 @@ end
 end
 
 function Vfft = sample_full_potential_fft_local(L, pVr, sampleM)
-%Sample full potential FFT.
+% Sample full potential FFT.
 dx = L / sampleM;
 x = -L / 2 + dx / 2 : dx : L / 2 - dx / 2;
 [X, Y] = meshgrid(x, x);
@@ -263,7 +272,7 @@ Vfft = ifftn(V);
 end
 
 function Vr = example1_potential_grid_local(p, L, X, Y)
-%Compute potential grid.
+% Compute potential grid.
 alpha = 5;
 p = p * 2 * pi / L;
 
@@ -286,12 +295,12 @@ end
 
 function [uh, D, rnorms, stats] = solve_generalized_eigs_local( ...
 Mat, M, nEigs, target, ops, method)
-%Solve the full-domain eigenproblem without preconditioning.
+% Solve the full-domain eigenproblem without preconditioning.
 [uh, D, rnorms, stats] = call_primme_noprec_local(Mat, M, nEigs, target, ops, method);
 end
 
 function [uh, D, rnorms, stats] = call_primme_noprec_local(Mat, M, nEigs, target, ops, method)
-%Call PRIMME noprec.
+% Solve the generalized eigenproblem with PRIMME without preconditioning.
 if is_identity_matrix_local(M)
     [uh, D, rnorms, stats] = call_primme_standard_noprec_local(Mat, nEigs, target, ops, method);
     return;
@@ -305,7 +314,7 @@ end
 end
 
 function [uh, D, rnorms, stats] = call_primme_standard_noprec_local(Mat, nEigs, target, ops, method)
-%Call PRIMME standard noprec.
+% Solve the standard eigenproblem with PRIMME without preconditioning.
 if ~isempty(method)
     [uh, D, rnorms, stats] = primme_eigs(Mat, nEigs, target, ops, method);
 else
@@ -314,13 +323,13 @@ end
 end
 
 function tf = is_identity_matrix_local(M)
-%Compute identity matrix.
+% Compute identity matrix.
 n = size(M, 1);
 tf = size(M, 2) == n && nnz(M - speye(n)) == 0;
 end
 
 function nurbsOriginal = make_rect_patch_local(rect)
-%Build rect patch.
+% Build an affine rectangular NURBS patch.
 x1 = rect(1); x2 = rect(2);
 y1 = rect(3); y2 = rect(4);
 
@@ -334,7 +343,7 @@ nurbsOriginal.weights = [1 1; 1 1];
 end
 
 function [kList, nBasis] = build_pw_disk_local(Nc)
-%Build PW disk.
+% Build the circular plane-wave index set.
 N = floor(Nc);
 kList = zeros((2 * N + 1) ^ 2, 2);
 nBasis = 0;
@@ -349,7 +358,7 @@ kList = kList(1:nBasis, :);
 end
 
 function [MatRed, MRed, fullToReduced] = apply_periodic_reduction_local(MatFull, MFull, nurbsRefine)
-%Apply periodic reduction.
+% Apply periodic reduction.
 fullToReduced = build_periodic_trace_map_local(nurbsRefine.m, nurbsRefine.n);
 nFull = numel(fullToReduced);
 nRed = max(fullToReduced);
@@ -361,7 +370,7 @@ MRed = 0.5 * (MRed + MRed');
 end
 
 function fullToReduced = build_periodic_trace_map_local(m, n)
-%Build periodic trace map.
+% Build periodic trace map.
 rep = reshape(1:(m * n), m, n);
 rep(m, :) = rep(1, :);
 rep(:, n) = rep(:, 1);
@@ -370,12 +379,12 @@ fullToReduced = double(fullToReduced(:));
 end
 
 function uhFull = expand_periodic_coeff_local(uhRed, fullToReduced)
-%Compute periodic coeff.
+% Expand reduced periodic coefficients to the full basis.
 uhFull = uhRed(fullToReduced, :);
 end
 
 function value = get_opt_local(opts, name, defaultValue)
-%Return one option value.
+% Read one option with a default value.
 if isfield(opts, name) && ~isempty(opts.(name))
     value = opts.(name);
 else

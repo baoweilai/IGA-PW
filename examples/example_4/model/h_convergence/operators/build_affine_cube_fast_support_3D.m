@@ -34,7 +34,7 @@ support.w_cache = precompute_basis_line_local( ...
 end
 
 function cache = precompute_basis_line_local(Breaks, knot, p, gp, gw, phys0, physScale)
-%Compute basis line.
+% Precompute one-dimensional basis values, derivatives, and weights.
 n_ele = numel(Breaks) - 1;
 nq = numel(gp);
 cache = cell(n_ele, 1);
@@ -62,7 +62,7 @@ end
 end
 
 function [tf, geom] = detect_affine_cube_geometry_local(nurbs_original)
-%Detect affine geometry for a cube patch.
+% Detect affine geometry for a cube patch.
 geom = struct('x0', 0, 'y0', 0, 'z0', 0, 'sx', 0, 'sy', 0, 'sz', 0, 'abs_detDF', 0);
 tf = false;
 
@@ -109,7 +109,7 @@ tf = true;
 end
 
 function v = max_abs_diff_local(A, dim)
-%Compute the maximum absolute difference.
+% Compute the maximum absolute difference.
 tmp = abs(diff(A, 1, dim));
 if isempty(tmp)
     v = 0;

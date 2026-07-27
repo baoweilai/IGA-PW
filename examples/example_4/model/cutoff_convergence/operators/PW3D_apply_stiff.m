@@ -1,5 +1,5 @@
 function [yP, yI_face] = PW3D_apply_stiff(xP, xI, pwData, faceData, sigma)
-%Apply the 3-D plane-wave stiffness operator.
+% Apply the 3-D plane-wave stiffness operator.
 
 [n_pw, nb] = size(xP);
 nI = size(xI,1);
@@ -67,18 +67,18 @@ end
 end
 
 function X = ball_to_cube_single(x, pwData)
-%Compute to cube single.
+% Scatter spherical-cutoff coefficients into a Cartesian cube.
 X = zeros(pwData.K, pwData.K, pwData.K);
 X(pwData.linBall) = x;
 end
 
 function x = cube_to_ball_single(X, pwData)
-%Compute to ball single.
+% Gather spherical-cutoff coefficients from a Cartesian cube.
 x = X(pwData.linBall);
 end
 
 function Y = conv3_same_single(X, KerFFT, convN, K)
-%Compute same single.
+% Apply centered 3-D convolution to one coefficient cube.
 Xp = ifftshift(embed_center_single(X, convN));
 Yf = ifftn(fftn(Xp) .* KerFFT);
 Yf = fftshift(Yf);
@@ -86,7 +86,7 @@ Y  = extract_center_single(Yf, K);
 end
 
 function A = embed_center_single(X, convN)
-%Compute center single.
+% Embed one coefficient cube in the padded convolution grid.
 A = zeros(convN, convN, convN);
 K = size(X,1);
 i0 = floor((convN - K)/2) + 1;
@@ -94,13 +94,13 @@ A(i0:i0+K-1, i0:i0+K-1, i0:i0+K-1) = X;
 end
 
 function X = extract_center_single(A, K)
-%Extract center single.
+% Extract the centered coefficient cube from the padded grid.
 i0 = floor((size(A,1) - K)/2) + 1;
 X = A(i0:i0+K-1, i0:i0+K-1, i0:i0+K-1);
 end
 
 function val = face_forward_value_single(X, F, pwData, withNormal)
-%Compute forward value single.
+% Evaluate one plane-wave face trace and optional normal derivative.
 
 kvals = -pwData.N : pwData.N;
 alpha = pwData.alpha;
@@ -138,7 +138,7 @@ val = V(:);
 end
 
 function yP = face_adjoint_value_single(g, F, pwData)
-%Accumulate one face value contribution.
+% Accumulate one face value contribution.
 R = reshape(g, F.nq1, F.nq2);
 Aadj = F.E1' * R * conj(F.E2) / sqrt(pwData.Omega);
 
@@ -166,7 +166,7 @@ yP = cube_to_ball_single(Xadj, pwData);
 end
 
 function yP = face_adjoint_normal_single(g, F, pwData)
-%Accumulate one face normal contribution.
+% Accumulate one face normal contribution.
 R = reshape(g, F.nq1, F.nq2);
 Aadj = F.E1' * R * conj(F.E2) / sqrt(pwData.Omega);
 

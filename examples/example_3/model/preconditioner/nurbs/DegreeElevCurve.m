@@ -1,5 +1,6 @@
 function [Ubar,Q,wbar]=DegreeElevCurve(P,w,U,p,t)
-%Elevate a B-spline curve degree.
+% Elevate a B-spline curve degree.
+% Convert the control points to homogeneous coordinates and allocate outputs.
 [ndim,n]=size(P);
 Pw=WightedConPtsCurve(P,w);
 UBreks=unique(U);NoBreks=length(UBreks);
@@ -16,6 +17,7 @@ m=temp+NoBreks*t;
 Ubar=zeros(1,m);
 m=temp-1;
 
+% Build the Bezier degree-elevation coefficients.
 ph=p+t;ph2=fix(ph/2);
 bezalfs(1,1)=1.0;bezalfs(ph+1,p+1)=1.0;
 for i=1:ph2
@@ -34,15 +36,15 @@ for i=ph2+1:ph-1
     end
 end
 
+% Initialize the first knot span and its Bezier control points.
 mh=ph;kind=ph+1;
 r=-1;a=p;
-b=p+1;cind=1;
-ua=U(1);Qw(:,1)=Pw(:,1);
-Ubar(1:ph+1)=ua*ones(1,ph+1);
-% Uh(i+1)=ua;
-bpts(:,1:p+1)=Pw(:,1:p+1);
-%	bpts(:,i+1)=Pw(:,i+1);
+    b=p+1;cind=1;
+    ua=U(1);Qw(:,1)=Pw(:,1);
+    Ubar(1:ph+1)=ua*ones(1,ph+1);
+    bpts(:,1:p+1)=Pw(:,1:p+1);
 
+% Elevate each knot span and reconnect adjacent Bezier segments.
 while(b<m)
     i=b;
     while(b<m && U(b+1)==U(b+2))
@@ -135,17 +137,15 @@ while(b<m)
             bpts(:,j+1)=Nextbpts(:,j+1);
         end
         bpts(:,(r:p)+1)=Pw(:,b-p+r+1:b+1);
-        %	bpts(:,j+1)=Pw(:,b-p+j+1);
         a=b;b=b+1;ua=ub;
 
     else
         Ubar(kind+1:kind+ph+1)=ub*ones(1,ph+1);
-        % Uh(kind+i+1)=ub;
     end
 end
+% Project the elevated homogeneous control points.
 wbar=Qw(end,:);
 Q=Qw(1:ndim-1,:);
 for i=1:ndim-1
     Q(i,:)=Q(i,:)./wbar;
 end
-%================================Test=====================================

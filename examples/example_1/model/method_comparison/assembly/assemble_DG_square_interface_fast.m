@@ -134,6 +134,8 @@ end
 function [Pedge, Sedge, Pmm, Smm, meta] = assemble_horizontal_edge_local( ...
 breaks, knot, degree, fixed_vals, fixed_ders, plus_dofs, y_const, normal, ...
     pwx, pwy, alpha, Omega_area, a, inv_df, Kx)
+% Assemble one horizontal DG interface edge.
+% Prepare quadrature and sparse trace triplets.
 [gp, gw] = grule(10 * degree + 5);
 n_gp = numel(gp);
 n_elem = numel(breaks) - 1;
@@ -152,6 +154,7 @@ xq = zeros(nq, 1);
 cursor = 1;
 qid = 1;
 
+% Sample the IGA traces and normal derivatives.
 for e = 1:n_elem
     a_param = breaks(e);
     b_param = breaks(e + 1);
@@ -188,17 +191,20 @@ for e = 1:n_elem
     end
 end
 
+% Assemble the weighted IGA trace operators.
 Bplus = sparse(rows, cols, bvals, nq, numel(plus_dofs));
 Aplus = sparse(rows, cols, avals, nq, numel(plus_dofs));
 W = spdiags(wq, 0, nq, nq);
 WBplus = W * Bplus;
 WAplus = W * Aplus;
 
+% Evaluate the plane-wave traces and normal derivatives.
 phase_y = exp(-1i * alpha * y_const * pwy(:)).';
 Bminus = exp(-1i * alpha * (xq(:) * pwx(:).')) .* phase_y / sqrt(Omega_area);
 mult = (1i * alpha / 2) * (normal(1) * pwx(:).' + normal(2) * pwy(:).');
 WconjBminus = bsxfun(@times, conj(Bminus), wq);
 
+% Contract the quadrature data into the four DG blocks.
 Pedge = struct();
 Pedge.Ppp = Bplus.' * WBplus;
 Pedge.Ppm = -Bplus.' * WconjBminus;
@@ -223,6 +229,8 @@ end
 function [Pedge, Sedge, Pmm, Smm, meta] = assemble_vertical_edge_local( ...
 breaks, knot, degree, fixed_vals, fixed_ders, plus_dofs, x_const, normal, ...
     pwx, pwy, alpha, Omega_area, a, inv_df, Ky)
+% Assemble one vertical DG interface edge.
+% Prepare quadrature and sparse trace triplets.
 [gp, gw] = grule(10 * degree + 5);
 n_gp = numel(gp);
 n_elem = numel(breaks) - 1;
@@ -240,6 +248,7 @@ yq = zeros(nq, 1);
 cursor = 1;
 qid = 1;
 
+% Sample the IGA traces and normal derivatives.
 for e = 1:n_elem
     a_param = breaks(e);
     b_param = breaks(e + 1);
@@ -277,17 +286,20 @@ for e = 1:n_elem
     end
 end
 
+% Assemble the weighted IGA trace operators.
 Bplus = sparse(rows, cols, bvals, nq, numel(plus_dofs));
 Aplus = sparse(rows, cols, avals, nq, numel(plus_dofs));
 W = spdiags(wq, 0, nq, nq);
 WBplus = W * Bplus;
 WAplus = W * Aplus;
 
+% Evaluate the plane-wave traces and normal derivatives.
 phase_x = exp(-1i * alpha * x_const * pwx(:)).';
 Bminus = exp(-1i * alpha * (yq(:) * pwy(:).')) .* phase_x / sqrt(Omega_area);
 mult = (1i * alpha / 2) * (normal(1) * pwx(:).' + normal(2) * pwy(:).');
 WconjBminus = bsxfun(@times, conj(Bminus), wq);
 
+% Contract the quadrature data into the four DG blocks.
 Pedge = struct();
 Pedge.Ppp = Bplus.' * WBplus;
 Pedge.Ppm = -Bplus.' * WconjBminus;
@@ -310,7 +322,7 @@ meta.plus_dofs = numel(plus_dofs);
 end
 
 function F = interval_ft_general_local(q, aL, aR, alpha)
-%Compute ft general.
+% Integrate one Fourier mode over an arbitrary interval.
 F = zeros(size(q));
 idx0 = (q == 0);
 F(idx0) = aR - aL;

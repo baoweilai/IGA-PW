@@ -1,5 +1,5 @@
 function gridCache = build_midpoint_grid_cache_3D(L, mFFT, a)
-%Build midpoint grid cache 3D.
+% Build midpoint coordinates and inner-domain masks for a 3-D FFT grid.
 
 dx = L / mFFT;
 xmid = -L / 2 + dx / 2 + (0:mFFT-1) * dx;

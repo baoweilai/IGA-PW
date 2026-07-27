@@ -1,5 +1,5 @@
 function workflowDir = activate_example_workflow(workflowName, expectedSubdirs)
-%Activate paths for one example task.
+% Activate paths for one example task.
 
 stack = dbstack('-completenames');
 assert(numel(stack) >= 2, 'activate_example_workflow must be called from an example script.');
@@ -25,4 +25,9 @@ if isempty(workflowDir)
     workflowDir = fullfile(exampleDir, 'model', workflowName);
 end
 add_workflow_paths(workflowDir, expectedSubdirs);
+
+commonDir = fullfile(exampleDir, 'model', 'common');
+if isfolder(commonDir)
+    add_workflow_paths(commonDir, {'operators'});
+end
 end

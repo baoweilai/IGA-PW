@@ -1,8 +1,7 @@
 function [DSu,DSv,DSw]=bspVolumeder(P,U,pu,u,V,pv,v,W,pw,w)
-%Evaluate B-spline volume derivatives.
+% Evaluate B-spline volume derivatives.
 
-%    then we do not need to compute the basis functions again.
-
+% Select the active control points and knot spans.
 uspan=findspan(U,pu,u);
 vspan=findspan(V,pv,v);
 wspan=findspan(W,pw,w);
@@ -11,6 +10,7 @@ ndim=size(P,4); % The dimension of physical domain is 3
 
 temp=P(uspan-pu:uspan,vspan-pv:vspan,wspan-pw:wspan,:);
 
+% Build derivative control nets in each parametric direction.
 ConPtsUbar=zeros(pu,pv+1,pw+1,ndim);
 ConPtsVbar=zeros(pu+1,pv,pw+1,ndim);
 ConPtsWbar=zeros(pu+1,pv+1,pw,ndim);
@@ -33,26 +33,27 @@ for  dim=1:ndim
         end
     end
 
-        for i=1:pu+1
-           for j=1:pv
-              for k=1:pw+1
+    for i=1:pu+1
+        for j=1:pv
+            for k=1:pw+1
                 ConPtsVbar(i,j,k,dim) = pv*(temp(i,j+1,k,dim) -  temp(i,j,k,dim))/tempV(j);
             end
         end
-        end
+    end
 
-        for i=1:pu+1
-           for j=1:pv+1
-              for k=1:pw
+    for i=1:pu+1
+        for j=1:pv+1
+            for k=1:pw
                 ConPtsWbar(i,j,k,dim) = pw*(temp(i,j,k+1,dim) -  temp(i,j,k,dim))/tempW(k);
             end
         end
-        end
+    end
 
 
 end
 
 
+% Evaluate the derivative volume in the u direction.
 Ubar=U;
 Ubar([1,end])=[];
 Nu=bsplinebasis(Ubar,pu-1,u);
@@ -65,14 +66,15 @@ for dim=1:ndim
     for i=1:pu
         for j=1:pv+1
             for k=1:pw+1
-   DSu(dim)=DSu(dim) +ConPtsUbar(i,j,k,dim)*Nu(i)*Nv(j)*Nw(k);
+                DSu(dim)=DSu(dim) +ConPtsUbar(i,j,k,dim)*Nu(i)*Nv(j)*Nw(k);
             end
         end
     end
 
-    end
+end
 
 
+% Evaluate the derivative volume in the v direction.
 Vbar=V;
 Vbar([1,end])=[];
 Nu=bsplinebasis(U,pu,u);
@@ -85,7 +87,7 @@ for dim=1:ndim
     for i=1:pu+1
         for j=1:pv
             for k=1:pw+1
-   DSv(dim)=DSv(dim) + ConPtsVbar(i,j,k,dim)*Nu(i)*Nv(j)*Nw(k);
+                DSv(dim)=DSv(dim) + ConPtsVbar(i,j,k,dim)*Nu(i)*Nv(j)*Nw(k);
             end
         end
     end
@@ -93,6 +95,7 @@ for dim=1:ndim
 end
 
 
+% Evaluate the derivative volume in the w direction.
 Wbar=W;
 Wbar([1,end])=[];
 Nu=bsplinebasis(U,pu,u);
@@ -106,7 +109,7 @@ for dim=1:ndim
     for i=1:pu+1
         for j=1:pv+1
             for k=1:pw
-   DSw(dim)=DSw(dim) + ConPtsWbar(i,j,k,dim)*Nu(i)*Nv(j)*Nw(k);
+                DSw(dim)=DSw(dim) + ConPtsWbar(i,j,k,dim)*Nu(i)*Nv(j)*Nw(k);
             end
         end
     end

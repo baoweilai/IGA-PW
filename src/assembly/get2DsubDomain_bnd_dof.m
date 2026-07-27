@@ -1,5 +1,5 @@
 function  bnd_dofs_idx = get2DsubDomain_bnd_dof(nurbs_refine_domains,mp)
-%Find boundary degrees of freedom for each subdomain.
+% Find boundary degrees of freedom for each subdomain.
 nx = mp.nx;
 ny = mp.ny;
 %% For elements on left edge

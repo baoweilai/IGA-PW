@@ -1,5 +1,5 @@
 function Pw=WightedConPtsCurve(P,w)
-%Convert curve control points to homogeneous form.
+% Convert curve control points to homogeneous form.
 
 [ndim,n]=size(P);
 Pw=zeros(ndim+1,n);

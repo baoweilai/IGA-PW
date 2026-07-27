@@ -1,5 +1,5 @@
 function E = cached_dg_error(cacheFile, refFile, runFile, opt)
-%Load or compute cached DG error data.
+% Load or compute cached DG error data.
 refStamp = file_stamp_local(refFile);
 runStamp = file_stamp_local(runFile);
 optKey = opt_key_local(opt);
@@ -31,7 +31,7 @@ save(cacheFile, 'E');
 end
 
 function tf = is_valid_cache_local(E, refFile, runFile, refStamp, runStamp, optKey)
-%Check whether cached error data is current.
+% Check whether cached error data is current.
 tf = isfield(E, 'referenceRunFile') && isfield(E, 'caseRunFile') && ...
     isfield(E, 'referenceStamp') && isfield(E, 'caseStamp') && isfield(E, 'optKey') && ...
     strcmp(E.referenceRunFile, refFile) && strcmp(E.caseRunFile, runFile) && ...
@@ -40,14 +40,14 @@ tf = isfield(E, 'referenceRunFile') && isfield(E, 'caseRunFile') && ...
 end
 
 function stamp = file_stamp_local(fileName)
-%Return a file timestamp key.
+% Return a file timestamp key.
 d = dir(fileName);
 if isempty(d), error('Missing run file: %s', fileName); end
 stamp = d.datenum + d.bytes * eps;
 end
 
 function key = opt_key_local(opt)
-%Build a cache key from options.
+% Build a cache key from options.
 fields = {'innerGridN', 'outerGridN', 'faceGridN', 'chunkSize', 'Csigma'};
 parts = cell(1, numel(fields));
 for i = 1:numel(fields)

@@ -1,11 +1,12 @@
 function run_h_data(refines)
-%Generate Example 2 h-convergence data.
+% Generate Example 2 h-convergence data.
 
 clc; close all;
 
+% Set workflow paths, solver parameters, and output directories.
 activate_example_workflow('h_convergence', ...
     {'nurbs', 'iga', 'assembly', ...
-    'operators', 'error_norms', 'core', 'solver'});
+    'operators', 'error_norms', 'core'});
 exampleDir = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 dataDir = fullfile(exampleDir, 'data');
 oldDir = pwd;
@@ -13,9 +14,6 @@ cleanupObj = onCleanup(@() cd(oldDir));
 cd(dataDir);
 
 Example = 'Example_2';
-if nargin < 1 || isempty(refines)
-    refines = 2:6;
-end
 
 caseSpecs = [ ...
     struct('Nc', 30, 't', 1, 'refines', refines)];
@@ -44,6 +42,7 @@ if ~exist(resultRoot, 'dir'), mkdir(resultRoot); end
 cacheRoot = fullfile(resultRoot, 'cache_pw');
 if ~exist(cacheRoot, 'dir'), mkdir(cacheRoot); end
 
+% Solve or load each configured refinement case.
 for icase = 1:numel(caseSpecs)
     Nc = caseSpecs(icase).Nc;
     t = caseSpecs(icase).t;
@@ -114,6 +113,7 @@ for icase = 1:numel(caseSpecs)
         n_dofs(ii)     = ndof;
     end
 
+    % Merge and save the refinement summary.
     Tnew = table(refList, n_dofs, 'VariableNames', {'refine','dof'});
     for k = 1:n_eigenvalues
         Tnew.(sprintf('lambda%d', k)) = Lambda_h(:, k);

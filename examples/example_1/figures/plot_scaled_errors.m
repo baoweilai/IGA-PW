@@ -1,5 +1,5 @@
 function plot_scaled_errors()
-%Plot scaled error curves.
+% Plot scaled error curves.
 
 clc; close all; format short e;
 
@@ -10,12 +10,8 @@ set(groot, ...
     'defaultAxesTickLabelInterpreter', 'latex');
 
 %% ---------------- user params ----------------
-p_list     = [2];
+p_list     = 2;
 alpha_list = [1.0, 2.0];
-
-savePNG = true;
-savePDF = true;
-pngDPI  = 600;
 
 %% ====================== style params ======================
 cfg = struct();
@@ -35,12 +31,18 @@ cfg.layout.top    = 0.08;
 % 3) curves
 cfg.curve.lw       = 1.8;
 cfg.curve.ms       = 8;
-cfg.curve.colL2    = [223 122 094] / 255;
-cfg.curve.colDG    = [060 064 091] / 255;
+cfg.curve.lineColors = [ ...
+    223 122 094;
+    060 064 091;
+    130 178 154;
+    242 204 142] / 255;
 cfg.curve.colSlope = [033 158 188] / 255;
 cfg.curve.mkL2     = 'o';
 cfg.curve.mkDG     = 's';
-cfg.curve.lsData   = '-';
+cfg.curve.mkL2u3   = '^';
+cfg.curve.mkDGu3   = 'd';
+cfg.curve.lsU1     = '-';
+cfg.curve.lsU3     = '-';
 cfg.curve.lsSlope  = '--';
 
 % 4) axes
@@ -56,21 +58,25 @@ cfg.axes.labelSize  = 13;
 
 % 5) reference slope line
 cfg.slope.lw        = 1.8;
-cfg.slope.factor_p1 = [0.18, 0.07, 0.08, 0.10];
-cfg.slope.factor_p2 = [0.10, 0.05, 0.07, 0.07];
+cfg.slope.minGap    = 5;
 
 % 6) padding
 cfg.pad.x = 1.2;
-cfg.pad.y = 1.8;
+cfg.ypad  = [1e-8, 1e-6];
+cfg.ytop  = [1, 2];
 
-% 7) manual y ticks
-cfg.ytick      = 10.^[-3 -2 -1];
-cfg.yticklabel = {'$10^{-3}$','$10^{-2}$','$10^{-1}$'};
+% 7) manual y ticks for scale = 1 and 2
+cfg.ytickExponent = {[-8, -6, -4, -2, 0], [-6, -4, -2, 0]};
 
-% 8) legend
-cfg.legend.loc      = 'southeast';
-cfg.legend.box      = 'off';
-cfg.legend.fontSize = 11;
+% 8) two-column in-axes legend (Slope on the left)
+cfg.legend.xL1      = 0.30;
+cfg.legend.xL2      = 0.38;
+cfg.legend.xLT      = 0.40;
+cfg.legend.xR1      = 0.64;
+cfg.legend.xR2      = 0.72;
+cfg.legend.xRT      = 0.74;
+cfg.legend.rowY     = [0.30, 0.18, 0.06];
+cfg.legend.fontSize = 10;  % fixed at 10 pt
 
 %% ---------------- paths ----------------
 resultRoot = fullfile(pwd, 'result', 'scaled_errors');
@@ -98,6 +104,8 @@ for ip = 1:numel(p_list)
         x  = Ti.h(:);
         y1 = Ti.u1_L2(:);
         y2 = Ti.h_gamma_DG(:);
+        y3 = Ti.u3_L2(:);
+        y4 = Ti.u3_h_gamma_DG(:);
 
         fig = figure( ...
             'Color',    cfg.fig.bgColor, ...
@@ -105,7 +113,8 @@ for ip = 1:numel(p_list)
             'Position', [1 1 cfg.fig.width cfg.fig.height], ...
             'Renderer', cfg.fig.renderer);
 
-        ax = axes(fig);
+        ax = axes('Parent', fig);
+        ax.Toolbar.Visible = 'off';
         hold(ax, 'on');
         box(ax, 'on');
 
@@ -132,32 +141,47 @@ for ip = 1:numel(p_list)
         ax.XRuler.MinorTick = 'off';
         ax.YRuler.MinorTick = 'off';
 
-        h1 = plot(ax, x, y1, cfg.curve.lsData, ...
+        h1 = plot(ax, x, y1, cfg.curve.lsU1, ...
             'LineWidth', cfg.curve.lw, ...
-            'Color', cfg.curve.colL2, ...
+            'Color', cfg.curve.lineColors(1, :), ...
             'Marker', cfg.curve.mkL2, ...
             'MarkerSize', cfg.curve.ms, ...
             'MarkerFaceColor', 'w', ...
-            'MarkerEdgeColor', cfg.curve.colL2);
+            'MarkerEdgeColor', cfg.curve.lineColors(1, :));
 
-        h2 = plot(ax, x, y2, cfg.curve.lsData, ...
+        h2 = plot(ax, x, y2, cfg.curve.lsU1, ...
             'LineWidth', cfg.curve.lw, ...
-            'Color', cfg.curve.colDG, ...
+            'Color', cfg.curve.lineColors(2, :), ...
             'Marker', cfg.curve.mkDG, ...
             'MarkerSize', cfg.curve.ms, ...
             'MarkerFaceColor', 'w', ...
-            'MarkerEdgeColor', cfg.curve.colDG);
+            'MarkerEdgeColor', cfg.curve.lineColors(2, :));
+
+        h3 = plot(ax, x, y3, cfg.curve.lsU3, ...
+            'LineWidth', cfg.curve.lw, ...
+            'Color', cfg.curve.lineColors(3, :), ...
+            'Marker', cfg.curve.mkL2u3, ...
+            'MarkerSize', cfg.curve.ms, ...
+            'MarkerFaceColor', 'w', ...
+            'MarkerEdgeColor', cfg.curve.lineColors(3, :));
+
+        h4 = plot(ax, x, y4, cfg.curve.lsU3, ...
+            'LineWidth', cfg.curve.lw, ...
+            'Color', cfg.curve.lineColors(4, :), ...
+            'Marker', cfg.curve.mkDGu3, ...
+            'MarkerSize', cfg.curve.ms, ...
+            'MarkerFaceColor', 'w', ...
+            'MarkerEdgeColor', cfg.curve.lineColors(4, :));
 
         % reference slope line
         x0 = x(round(numel(x)/2));
-        if pdeg == 1
-            fac = cfg.slope.factor_p1(ia);
-        else
-            fac = cfg.slope.factor_p2(ia);
-        end
-        yRef = fac * max([y1; y2]) * (x / x0).^slope_ref;
+        yEnvelope = max([y1, y2, y3, y4], [], 2);
+        yScale = max(yEnvelope);
+        slopeShape = (x / x0).^slope_ref;
+        fac = cfg.slope.minGap * max(yEnvelope ./ (yScale * slopeShape));
+        yRef = fac * yScale * slopeShape;
 
-        h3 = plot(ax, x, yRef, cfg.curve.lsSlope, ...
+        h5 = plot(ax, x, yRef, cfg.curve.lsSlope, ...
             'Color', cfg.curve.colSlope, ...
             'LineWidth', cfg.slope.lw);
 
@@ -172,52 +196,138 @@ for ip = 1:numel(p_list)
         axisSpec.XLim  = [min(x)/cfg.pad.x, max(x)*cfg.pad.x];
 
         % y-axis expand
-        yAll = [y1; y2; yRef];
+        yAll = [y1; y2; y3; y4; yRef];
         yAll = yAll(isfinite(yAll) & yAll > 0);
-        axisSpec.YLim = [min(yAll)/cfg.pad.y, max(yAll)*cfg.pad.y];
+        axisSpec.YLim = [cfg.ypad(ia), cfg.ytop(ia)];
+        assert(min(yAll) >= axisSpec.YLim(1) && max(yAll) <= axisSpec.YLim(2), ...
+            'Scaled-error curves exceed the requested y-limits for scale index %d.', ia);
 
-        % manual y-ticks within current y-limits
-        yt = cfg.ytick(cfg.ytick >= axisSpec.YLim(1) & cfg.ytick <= axisSpec.YLim(2));
-        if ~isempty(yt)
-            axisSpec.YTick = yt;
-            axisSpec.YTickLabel = cfg.yticklabel(ismember(cfg.ytick, yt));
-        else
-            axisSpec.YTick = [];
-            axisSpec.YTickLabel = {};
-        end
+        % manual y-ticks
+        tickExponent = cfg.ytickExponent{ia};
+        axisSpec.YTick = 10.^tickExponent;
+        axisSpec.YTickLabel = arrayfun(@(e) sprintf('$10^{%d}$', e), ...
+            tickExponent, 'UniformOutput', false);
 
         ax.XTick = axisSpec.XTick;
         ax.XLim  = axisSpec.XLim;
         ax.YLim  = axisSpec.YLim;
+        ax.YTick = axisSpec.YTick;
+        ax.YTickLabel = axisSpec.YTickLabel;
 
-        if ~isempty(axisSpec.YTick)
-            ax.YTick = axisSpec.YTick;
-            ax.YTickLabel = axisSpec.YTickLabel;
-        end
-
-        lgd = legend(ax, [h1, h2, h3], ...
-            {'$\|u_1-u_1^{\mathrm{DG}}\|_{L^2}$', ...
-            '$h^\gamma \|u_1-u_1^{\mathrm{DG}}\|_{\mathrm{DG}}$', ...
-            sprintf('$\\mathrm{Slope} = %.2f$', slope_ref)}, ...
-            'Interpreter', 'latex', ...
-            'Location',    cfg.legend.loc, ...
-            'FontSize',    cfg.legend.fontSize);
-        lgd.Box = cfg.legend.box;
+        draw_scaled_legend_in_axes(ax, [h1, h2, h3, h4], h5, slope_ref, cfg);
 
         baseFile = sprintf('scaled_%d', ia);
 
-        pngFile = fullfile(outDir, [baseFile, '.png']);
         pdfFile = fullfile(outDir, [baseFile, '.pdf']);
 
-        if savePNG
-            exportgraphics(fig, pngFile, 'Resolution', pngDPI);
-            fprintf('[SAVE] %s\n', pngFile);
-        end
-        if savePDF
-            exportgraphics(fig, pdfFile, 'ContentType', 'vector');
-            fprintf('[SAVE] %s\n', pdfFile);
-        end
+        exportgraphics(fig, pdfFile, 'ContentType', 'vector');
+        fprintf('[SAVE] %s\n', pdfFile);
     end
+end
+
+function draw_scaled_legend_in_axes(ax, hError, hSlope, slopeRef, cfg)
+% Draw a two-column legend inside the axes.
+
+labels = { ...
+    '$\|u_1-u_1^{\mathrm{DG}}\|_{L^2}$', ...
+    '$h^\beta \|u_1-u_1^{\mathrm{DG}}\|_{\mathrm{DG}}$', ...
+    '$\|u_3-u_3^{\mathrm{DG}}\|_{L^2}$', ...
+    '$h^\beta \|u_3-u_3^{\mathrm{DG}}\|_{\mathrm{DG}}$'};
+
+leftEntries = [1, 3];
+rightEntries = [2, 4];
+
+for j = 1:2
+    idx = leftEntries(j);
+    draw_one_fake_entry_in_axes(ax, hError(idx), '-', ...
+        cfg.legend.xL1, cfg.legend.xL2, cfg.legend.xLT, ...
+        cfg.legend.rowY(j + 1), labels{idx}, cfg.legend.fontSize);
+end
+
+for j = 1:2
+    idx = rightEntries(j);
+    draw_one_fake_entry_in_axes(ax, hError(idx), '-', ...
+        cfg.legend.xR1, cfg.legend.xR2, cfg.legend.xRT, ...
+        cfg.legend.rowY(j + 1), labels{idx}, cfg.legend.fontSize);
+end
+
+slopeLabel = sprintf('$\\mathrm{Slope} = %.2f$', slopeRef);
+draw_one_fake_entry_in_axes(ax, hSlope, '--', ...
+    cfg.legend.xR1, cfg.legend.xR2, cfg.legend.xRT, ...
+    cfg.legend.rowY(1), slopeLabel, cfg.legend.fontSize);
+
+end
+
+function draw_one_fake_entry_in_axes(ax, hLine, legendLineStyle, x1n, x2n, xtn, yn, labelStr, fontSize)
+% Draw one fake-legend entry using normalized axes coordinates.
+
+c  = get(hLine, 'Color');
+lw = get(hLine, 'LineWidth');
+
+mk  = get(hLine, 'Marker');
+ms  = get(hLine, 'MarkerSize');
+mfc = get(hLine, 'MarkerFaceColor');
+mec = get(hLine, 'MarkerEdgeColor');
+
+[x1, y1] = axes_norm_to_data(ax, x1n, yn);
+[x2, y2] = axes_norm_to_data(ax, x2n, yn);
+[xt, yt] = axes_norm_to_data(ax, xtn, yn);
+
+xm = sqrt(x1 * x2);
+ym = y1;
+
+line(ax, [x1 x2], [y1 y2], ...
+    'LineStyle', legendLineStyle, ...
+    'Color', c, ...
+    'LineWidth', lw, ...
+    'Marker', 'none', ...
+    'Clipping', 'off');
+
+if ~strcmp(mk, 'none')
+    line(ax, xm, ym, ...
+        'LineStyle', 'none', ...
+        'Color', c, ...
+        'Marker', mk, ...
+        'MarkerSize', ms, ...
+        'MarkerFaceColor', mfc, ...
+        'MarkerEdgeColor', mec, ...
+        'LineWidth', lw, ...
+        'Clipping', 'off');
+end
+
+text(ax, xt, yt, labelStr, ...
+    'Interpreter', 'latex', ...
+    'FontSize', fontSize, ...
+    'HorizontalAlignment', 'left', ...
+    'VerticalAlignment', 'middle', ...
+    'BackgroundColor', 'w', ...
+    'Margin', 0.5, ...
+    'Clipping', 'off');
+
+end
+
+function [x, y] = axes_norm_to_data(ax, xn, yn)
+% Convert normalized axes coordinates to data coordinates.
+
+xlimv = ax.XLim;
+ylimv = ax.YLim;
+
+if strcmpi(ax.XScale, 'log')
+    lx1 = log10(xlimv(1));
+    lx2 = log10(xlimv(2));
+    x = 10^(lx1 + xn * (lx2 - lx1));
+else
+    x = xlimv(1) + xn * (xlimv(2) - xlimv(1));
+end
+
+if strcmpi(ax.YScale, 'log')
+    ly1 = log10(ylimv(1));
+    ly2 = log10(ylimv(2));
+    y = 10^(ly1 + yn * (ly2 - ly1));
+else
+    y = ylimv(1) + yn * (ylimv(2) - ylimv(1));
+end
+
 end
 
 end

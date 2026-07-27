@@ -2,7 +2,7 @@
 L, inner_domains, qvals, inner_cheb_n, sample_fun)
 % Build inner-cube Fourier coefficients by tensor-product Chebyshev expansion.
 % VinCheb(qx,qy,qz) = int_{[-a,a]^3} V(x,y,z) exp(-i alpha q.r) dxdydz / Omega
-% The input sample_fun must accept array inputs X,Y,Z of identical size and
+% The input sample_fun accepts array inputs X,Y,Z of identical size and
 arguments
 L
 inner_domains
@@ -73,7 +73,7 @@ info.coeff_norm = norm(C(:));
 end
 
 function Y = mode_product_local(X, A, dim)
-%Evaluate a tensor-product mode.
+% Evaluate a tensor-product mode.
 perm = [dim, 1:dim-1, dim+1:ndims(X)];
 Xp = permute(X, perm);
 sz = size(Xp);

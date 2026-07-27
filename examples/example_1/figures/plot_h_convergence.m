@@ -1,5 +1,5 @@
 function plot_h_convergence()
-%Plot h-convergence data.
+% Plot h-convergence data.
 
 clc; close all;
 format short g;
@@ -119,7 +119,9 @@ for k = 1:numel(p_list)
 end
 
 %% ======================= Prepare output table ==========================
-Rows = {};
+nOrderRows = sum(arrayfun(@(x) ...
+    (numel(x.h) - 1) * numel(eig_list), data));
+Rows = cell(nOrderRows, 6);
 rowCount = 0;
 
 %% ======================= Plot and compute orders =======================
@@ -132,10 +134,8 @@ for k = 1:numel(data)
     fig = plot_one_p(h, lam, lambda_ref, pp, eig_list, cfg);
 
     figBase = 'h';
-    outPng  = fullfile(data(k).pDir, [figBase '.png']);
     outPdf  = fullfile(data(k).pDir, [figBase '.pdf']);
 
-    exportgraphics(fig, outPng, 'Resolution', 600);
     exportgraphics(fig, outPdf, 'ContentType', 'vector');
     drawnow;
 
@@ -182,7 +182,7 @@ fprintf('[Saved] %s\n', out_mat);
 end
 
 function fig = plot_one_p(h, lam, lambda_ref, pdeg, eig_list, cfg)
-%Plot one p.
+% Plot the convergence curves for one spline degree.
 
 err = abs(lam(:, eig_list) - lambda_ref(1, eig_list));
 
@@ -322,7 +322,7 @@ draw_fake_legend_in_axes(ax, pdeg, hEig, hOrder2, hOrder4, eig_list, cfg);
 end
 
 function draw_fake_legend_in_axes(ax, pdeg, hEig, hOrder2, hOrder4, eig_list, cfg)
-%Draw fake legend in axes.
+% Draw an in-axes legend using proxy curves.
 
 for j = 1:numel(eig_list)
     lbl = sprintf('$i=%d$', eig_list(j));
@@ -346,8 +346,9 @@ end
 end
 
 function draw_one_fake_entry_in_axes(ax, hLine, x1n, x2n, xtn, yn, labelStr, cfg)
-%Draw one fake entry in axes.
+% Draw one manual legend entry inside the axes.
 
+% Read the source line and marker styling.
 c  = get(hLine, 'Color');
 ls = get(hLine, 'LineStyle');
 lw = get(hLine, 'LineWidth');
@@ -370,6 +371,7 @@ if isprop(hLine, 'MarkerEdgeColor')
     mec = get(hLine, 'MarkerEdgeColor');
 end
 
+% Convert normalized legend positions to data coordinates.
 [x1, y1] = axes_norm_to_data(ax, x1n, yn);
 [x2, y2] = axes_norm_to_data(ax, x2n, yn);
 [xt, yt] = axes_norm_to_data(ax, xtn, yn);
@@ -377,6 +379,7 @@ end
 xm = 0.49 * (x1 + x2);
 ym = y1;
 
+% Draw the line sample, marker, and label.
 line(ax, [x1 x2], [y1 y2], ...
     'LineStyle', ls, ...
     'Color', c, ...
@@ -406,7 +409,7 @@ text(ax, xt, yt, labelStr, ...
 end
 
 function [x, y] = axes_norm_to_data(ax, xn, yn)
-%Compute norm to data.
+% Convert normalized axes coordinates to data coordinates.
 
 xlimv = ax.XLim;
 ylimv = ax.YLim;
@@ -429,7 +432,7 @@ end
 end
 
 function ord = local_orders_matrix(h, err)
-%Compute orders matrix.
+% Compute observed convergence orders between adjacent mesh sizes.
 
 n  = numel(h);
 ne = size(err, 2);
@@ -443,7 +446,7 @@ end
 end
 
 function y = round_sig(x, nSig)
-%Round a value to significant digits.
+% Round a value to significant digits.
 
 y = x;
 

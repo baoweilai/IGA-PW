@@ -1,6 +1,7 @@
 function plot_method_fields()
-%Plot density and potential fields.
+% Plot density and potential fields.
 
+% Resolve the method-comparison workflow and case parameters.
 clc; close all;
 
 scriptDir = fileparts(mfilename('fullpath'));
@@ -14,6 +15,7 @@ cfgIGA = struct('pdeg', 1, 'refine', 6);
 cfgHybrid = struct('Nc', 10, 'pdeg', 1, 'refine', 4, 't', 0);
 cfgRef = struct('Nc', 45, 'pdeg', 3, 'refine', 8, 't', 2);
 
+% Create method-specific result and field directories.
 outDir = fullfile(repoRoot, 'data', 'method_fields');
 refDir = fullfile(outDir, 'reference');
 pwDir = fullfile(outDir, 'pw');
@@ -32,11 +34,13 @@ common = make_common_opts_local(scriptDir);
 fprintf('\n============================================================\n');
 fprintf('[RUN ] Example 2 PW / IGA / IGA-PW u1 comparison\n');
 
+% Load or compute the four method solutions.
 refRun = load_or_run_reference_local(refDir, cfgRef, common);
 pwRun = load_or_run_pw_local(pwDir, cfgPW, common);
 igaRun = load_or_run_iga_local(igaDir, cfgIGA, common);
 igapwRun = load_or_run_hybrid_local(igapwDir, cfgHybrid, common);
 
+% Evaluate and phase-align every solution on a shared grid.
 gridN = 401;
 [Xg, Yg] = meshgrid(linspace(-2, 2, gridN), linspace(-2, 2, gridN));
 dxg = Xg(1, 2) - Xg(1, 1);
@@ -58,6 +62,7 @@ Err = {abs(Upw - Uref); abs(Uiga - Uref); abs(Uigapw - Uref)};
 methodNames = {'PW', 'IGA', 'IGA-PW'};
 plotNames = {'PW', 'IGA', 'IGA-PW', 'Reference'};
 
+% Save the comparison table and sampled fields.
 summaryTable = build_summary_table_local(pwRun, igaRun, igapwRun, refRun, cfgPW, cfgIGA, cfgHybrid, cfgRef, Err, dxg);
 writetable(summaryTable, fullfile(outDir, 'summary.csv'));
 
@@ -67,6 +72,7 @@ save(fullfile(fieldsDir, 'fields.mat'), ...
 
 cleanup_legacy_outputs_local(outDir);
 
+% Export the shared-scale field and error PDFs.
 example1RefCmap = example1_reference_colormap_local(256);
 fieldClimU1 = shared_field_clim_local(U(1:3));
 errorClimU1 = shared_error_clim_local(Err);
@@ -83,7 +89,7 @@ fprintf('============================================================\n\n');
 end
 
 function common = make_common_opts_local(scriptDir)
-%Build common opts.
+% Build solver options shared by all method cases.
 exampleDir = fileparts(scriptDir);
 common = struct();
 common.Example = 'Example_2';
@@ -99,8 +105,6 @@ common.n_eigenvalues = 1;
 common.save_eigenvectors = true;
 common.save_nurbs = true;
 common.save_pw_index = true;
-common.save_matrices = false;
-common.save_mat = false;
 common.use_pw_cache = true;
 common.cacheRoot = fullfile(exampleDir, 'data', 'method_fields', 'cache_pw_shared');
 common.cacheNurbsRoot = fullfile(exampleDir, 'data', 'method_fields', 'cache_nurbs_shared');
@@ -115,8 +119,8 @@ ensure_dir_local(common.cacheNurbsRoot);
 ensure_dir_local(common.cacheInterfaceRoot);
 end
 
-function run = load_or_run_reference_local(outDir, cfg, common)
-%Load or run reference.
+function run = load_or_run_reference_local(outDir, cfg, ~)
+% Load or compute the reference field.
 fprintf('[CASE] reference IGA-PW (Nc=%d, p=%d, refine=%d, h-reference)\n', cfg.Nc, cfg.pdeg, cfg.refine);
 runFile = fullfile(outDir, 'run.mat');
 
@@ -146,7 +150,7 @@ save(runFile, 'run', '-v7.3');
 end
 
 function run = load_or_run_pw_local(outDir, cfg, common)
-%Load or run PW.
+% Load or compute the full-domain plane-wave field.
 fprintf('[CASE] PW-only (Nc=%d)\n', cfg.Nc);
 runFile = fullfile(outDir, 'run.mat');
 if exist(runFile, 'file')
@@ -165,7 +169,7 @@ run = S.run;
 end
 
 function run = load_or_run_iga_local(outDir, cfg, common)
-%Load or run IGA.
+% Load or compute the full-domain IGA field.
 fprintf('[CASE] IGA-only (p=%d, refine=%d)\n', cfg.pdeg, cfg.refine);
 runFile = fullfile(outDir, 'run.mat');
 if exist(runFile, 'file')
@@ -178,14 +182,13 @@ end
 opts = common;
 opts.outDir = outDir;
 opts.solve_mode = 'purediag';
-opts.periodic_bc_iga = true;
 solve_full_domain('iga', struct('pdeg', cfg.pdeg, 'refine', cfg.refine), opts);
 S = load(runFile, 'run');
 run = S.run;
 end
 
 function run = load_or_run_hybrid_local(outDir, cfg, common)
-%Load or run hybrid.
+% Load or compute the IGA-PW field.
 fprintf('[CASE] IGA-PW (Nc=%d, p=%d, refine=%d, InterfaceBlock)\n', cfg.Nc, cfg.pdeg, cfg.refine);
 runFile = fullfile(outDir, 'run.mat');
 if exist(runFile, 'file')
@@ -204,7 +207,7 @@ run = S.run;
 end
 
 function summaryTable = build_summary_table_local(pwRun, igaRun, igapwRun, refRun, cfgPW, cfgIGA, cfgHybrid, cfgRef, Err, dxg)
-%Build summary table.
+% Build summary table.
 method = {'PW'; 'IGA'; 'IGA-PW'; 'Reference'};
 Nc = [cfgPW.Nc; 0; cfgHybrid.Nc; cfgRef.Nc];
 pdeg = [0; cfgIGA.pdeg; cfgHybrid.pdeg; cfgRef.pdeg];
@@ -217,12 +220,12 @@ summaryTable = table(method, Nc, pdeg, refine, h, lambda1, abs_err_lambda1, l2_e
 end
 
 function val = l2_error_from_grid_local(fieldVals, dx)
-%Compute error from grid.
+% Compute the discrete L2 error on the plotting grid.
 val = sqrt(sum(abs(fieldVals(:)).^2) * dx * dx);
 end
 
 function [Uout, meta] = normalize_and_align_local(Uin, Uref, dx)
-%Normalize and align.
+% Normalize the field and align its phase with the reference.
 u = Uin;
 norm_before = sqrt(max(sum(abs(u(:)).^2) * dx * dx, eps));
 u = u ./ norm_before;
@@ -254,7 +257,7 @@ meta = struct('norm_before', norm_before, 'phase_applied', phase_applied);
 end
 
 function Ugrid = evaluate_run_on_grid_local(run, kind, Xg, Yg)
-%Evaluate a saved solution on a plotting grid.
+% Evaluate a saved solution on a plotting grid.
 coeff = run.uh(:, 1);
 L = 4;
 
@@ -300,7 +303,7 @@ end
 end
 
 function val = pw_eval_val_chunked_local(coeff, p_vec, X, Y, L, chunkSize)
-%Evaluate field values in chunks.
+% Evaluate field values in chunks.
 nPts = numel(X);
 val = zeros(nPts, 1);
 for i1 = 1:chunkSize:nPts
@@ -312,7 +315,7 @@ end
 end
 
 function val = iga_eval_on_one_patch_local(nurbs, coeff, X, Y, xc, yc, a)
-%Compute eval on one patch.
+% Evaluate one IGA patch at the requested Cartesian points.
 pu = nurbs.pu;
 pv = nurbs.pv;
 U = nurbs.Ubar(:).';
@@ -348,7 +351,7 @@ end
 end
 
 function N = bspline_basis_local(U, p, u, span)
-%Evaluate local B-spline basis values.
+% Evaluate local B-spline basis values.
 ndu = zeros(p + 1, p + 1);
 left = zeros(1, p + 1);
 right = zeros(1, p + 1);
@@ -370,7 +373,7 @@ N = ndu(1:p + 1, p + 1).';
 end
 
 function span = findspan_local(n, p, u, U)
-%Locate an index or object used by the computation.
+% Find the active knot span for a parameter value.
 if u >= U(n + 2)
     span = n + 1;
     return;
@@ -395,7 +398,7 @@ span = mid;
 end
 
 function export_split_field_set_local(Xg, Yg, fields, labels, outDir, eigTag, cmap, climVals)
-%Export split field set.
+% Export split field set.
 for i = 1:numel(labels)
     label = labels{i};
     if strcmpi(label, 'Reference')
@@ -408,7 +411,7 @@ end
 end
 
 function export_split_error_set_local(Xg, Yg, fields, labels, outDir, eigTag, cmap, climVals)
-%Export split error set.
+% Export split error set.
 for i = 1:numel(labels)
     label = labels{i};
     keepColorbar = strcmpi(label, 'IGA-PW');
@@ -418,7 +421,7 @@ end
 end
 
 function export_single_field_panel_local(Xg, Yg, fieldVals, baseName, cmap, climVals, keepColorbar)
-%Export single field panel.
+% Export single field panel.
 if keepColorbar
     fig = figure('Color', 'w', 'Units', 'inches', 'Position', [1, 1, 3.30, 2.55]);
     axPos = [0.01, 0.01, 0.758, 0.98];
@@ -434,19 +437,19 @@ imagesc(ax, Xg(1, :), Yg(:, 1), fieldVals);
 axis(ax, 'image');
 set(ax, 'YDir', 'normal');
 colormap(ax, cmap);
-caxis(ax, climVals);
+clim(ax, climVals);
 style_clean_image_axes_local(ax);
 
 if keepColorbar
     draw_clean_linear_colorbar_local(fig, cbPos, cmap, climVals);
 end
 
-export_figure_raster_local(fig, baseName, 600);
+export_pdf_local(fig, baseName, 600);
 close(fig);
 end
 
 function export_single_error_panel_local(Xg, Yg, fieldVals, baseName, cmap, climVals, keepColorbar)
-%Export single error panel.
+% Export single error panel.
 logMin = log10(max(climVals(1), eps));
 logMax = log10(climVals(2));
 errFloor = 10^logMin;
@@ -468,19 +471,19 @@ contourf(ax, Xg, Yg, Flog, levels, 'LineStyle', 'none');
 axis(ax, 'image');
 set(ax, 'YDir', 'normal');
 colormap(ax, cmap);
-caxis(ax, [logMin, logMax]);
+clim(ax, [logMin, logMax]);
 style_clean_image_axes_local(ax);
 
 if keepColorbar
     draw_clean_log_colorbar_local(fig, cbPos, cmap, logMin, logMax);
 end
 
-export_figure_raster_local(fig, baseName, 600);
+export_pdf_local(fig, baseName, 600);
 close(fig);
 end
 
 function climVals = shared_field_clim_local(fields)
-%Compute field clim.
+% Compute shared color limits for all solution fields.
 vals = [];
 for i = 1:numel(fields)
     vals = [vals; real(fields{i}(:))]; %#ok<AGROW>
@@ -504,7 +507,7 @@ end
 end
 
 function climVals = shared_error_clim_local(fields)
-%Compute error clim.
+% Compute shared color limits for all error fields.
 vals = [];
 for i = 1:numel(fields)
     vals = [vals; abs(fields{i}(:))]; %#ok<AGROW>
@@ -519,7 +522,7 @@ climVals = [max(cmax * 1e-5, eps), cmax];
 end
 
 function name = build_split_field_name_local(label, eigTag)
-%Build split field name.
+% Build split field name.
 switch string(label)
     case "IGA"
         prefix = 'IGA_eigenfunction';
@@ -534,7 +537,7 @@ name = sprintf('%s_%s', prefix, eigTag);
 end
 
 function name = build_split_error_name_local(label, eigTag)
-%Build split error name.
+% Build split error name.
 switch string(label)
     case "IGA"
         prefix = 'IGA_error';
@@ -549,13 +552,13 @@ name = sprintf('%s_%s', prefix, eigTag);
 end
 
 function style_clean_image_axes_local(ax)
-%Apply clean image axes.
+% Apply clean image axes.
 set(ax, 'XTick', [], 'YTick', [], 'Box', 'off', 'LineWidth', 0.5);
 axis(ax, 'off');
 end
 
 function draw_clean_linear_colorbar_local(fig, pos, cmap, climVals)
-%Draw clean linear colorbar.
+% Draw clean linear colorbar.
 cbax = axes(fig, 'Position', pos);
 grad = repmat(linspace(climVals(1), climVals(2), 512).', 1, 2);
 imagesc(cbax, [0, 1], [climVals(1), climVals(2)], grad);
@@ -569,7 +572,7 @@ yticks(cbax, default_colorbar_ticks_local(climVals(1), climVals(2)));
 end
 
 function draw_clean_log_colorbar_local(fig, pos, cmap, logMin, logMax)
-%Draw clean log colorbar.
+% Draw clean log colorbar.
 cbax = axes(fig, 'Position', pos);
 grad = repmat(linspace(logMin, logMax, 512).', 1, 2);
 imagesc(cbax, [0, 1], [logMin, logMax], grad);
@@ -585,13 +588,13 @@ yticklabels(cbax, tickLabels);
 end
 
 function tickVals = default_colorbar_ticks_local(cmin, cmax)
-%Compute colorbar ticks.
+% Compute linear colorbar tick positions.
 tmpFig = figure('Visible', 'off', 'Color', 'w');
 tmpAx = axes(tmpFig);
 imagesc(tmpAx, [0 1], [cmin cmax], [cmin cmin; cmax cmax]);
 set(tmpAx, 'YDir', 'normal');
 colormap(tmpAx, example1_reference_colormap_local(256));
-caxis(tmpAx, [cmin, cmax]);
+clim(tmpAx, [cmin, cmax]);
 tmpCb = colorbar(tmpAx);
 drawnow;
 tickVals = tmpCb.Ticks;
@@ -602,7 +605,7 @@ close(tmpFig);
 end
 
 function [ticks, tickLabels] = log_colorbar_ticks_local(logMin, logMax)
-%Compute colorbar ticks.
+% Compute logarithmic colorbar ticks and labels.
 eMin = ceil(logMin - 1e-10);
 eMax = floor(logMax + 1e-10);
 ticks = eMin:eMax;
@@ -618,8 +621,8 @@ end
 tickLabels = arrayfun(@(e) sprintf('10^{%d}', e), ticks, 'UniformOutput', false);
 end
 
-function export_figure_raster_local(fig, baseName, dpi)
-%Export figure raster.
+function export_pdf_local(fig, baseName, dpi)
+% Export a rasterized PDF.
 axList = findall(fig, 'Type', 'axes');
 for iax = 1:numel(axList)
     ax = axList(iax);
@@ -629,12 +632,11 @@ for iax = 1:numel(axList)
 end
 drawnow;
 set(fig, 'PaperPositionMode', 'auto');
-exportgraphics(fig, [baseName '.png'], 'Resolution', dpi, 'BackgroundColor', 'white');
 exportgraphics(fig, [baseName '.pdf'], 'ContentType', 'image', 'Resolution', dpi, 'BackgroundColor', 'white');
 end
 
 function write_caption_file_local(outDir, cfgPW, cfgIGA, cfgHybrid, cfgRef, summaryTable)
-%Write caption file.
+% Write the field-comparison caption and summary table.
 fid = fopen(fullfile(outDir, 'captions_example2_pw_iga_igapw.tex'), 'w');
 assert(fid >= 0, 'Failed to open caption file.');
 
@@ -658,7 +660,7 @@ fclose(fid);
 end
 
 function write_report_local(outDir, summaryTable, cfgPW, cfgIGA, cfgHybrid, cfgRef)
-%Write a text report.
+% Write a text report.
 fid = fopen(fullfile(outDir, 'report_example2_pw_iga_igapw.txt'), 'w');
 assert(fid >= 0, 'Failed to open report file.');
 
@@ -670,12 +672,12 @@ fprintf(fid, '- IGA: p = %d, refine = %d, periodic boundary condition, solve_mod
 fprintf(fid, '- IGA-PW: Nc = %d, p = %d, refine = %d, solve_mode = InterfaceBlock\n', cfgHybrid.Nc, cfgHybrid.pdeg, cfgHybrid.refine);
 fprintf(fid, '- Reference IGA-PW: Nc = %d, p = %d, refine = %d, solve_mode = InterfaceBlock\n\n', cfgRef.Nc, cfgRef.pdeg, cfgRef.refine);
 fprintf(fid, 'Saved figures\n');
-fprintf(fid, '- IGA_eigenfunction_u1.pdf/png\n');
-fprintf(fid, '- IGA-PW_eigenfunction_u1.pdf/png\n');
-fprintf(fid, '- PW_eigenfunction_u1.pdf/png\n');
-fprintf(fid, '- IGA_error_u1.pdf/png\n');
-fprintf(fid, '- IGA-PW_error_u1.pdf/png\n');
-fprintf(fid, '- PW_error_u1.pdf/png\n\n');
+fprintf(fid, '- IGA_eigenfunction_u1.pdf\n');
+fprintf(fid, '- IGA-PW_eigenfunction_u1.pdf\n');
+fprintf(fid, '- PW_eigenfunction_u1.pdf\n');
+fprintf(fid, '- IGA_error_u1.pdf\n');
+fprintf(fid, '- IGA-PW_error_u1.pdf\n');
+fprintf(fid, '- PW_error_u1.pdf\n\n');
 
 fprintf(fid, 'Eigenvalue and u1 error summary\n');
 fprintf(fid, '%-10s %-8s %-8s %-8s %-16s %-16s %-16s %-16s\n', ...
@@ -692,12 +694,10 @@ fclose(fid);
 end
 
 function cleanup_legacy_outputs_local(outDir)
-%Compute legacy outputs.
+% Delete method-field files outside the retained output set.
 patterns = {
     'figure*_example2_*.pdf'
-    'figure*_example2_*.png'
     'reference_eigenfunction_*.pdf'
-    'reference_eigenfunction_*.png'
     };
 for i = 1:numel(patterns)
     files = dir(fullfile(outDir, patterns{i}));
@@ -716,7 +716,7 @@ end
 end
 
 function cmap = example1_reference_colormap_local(n)
-%Compute reference colormap.
+% Build the shared reference colormap.
 anchors255 = [
     55, 105, 105;
     140, 190, 170;
@@ -728,7 +728,7 @@ cmap = colormap_from_anchors_local(anchors255, n);
 end
 
 function cmap = colormap_from_anchors_local(anchors255, n)
-%Build a colormap from anchor colors.
+% Build a colormap from anchor colors.
 A = anchors255 / 255;
 k = size(A, 1);
 x = linspace(0, 1, k);
@@ -741,7 +741,7 @@ cmap = min(max(cmap, 0), 1);
 end
 
 function s = num_to_str_local(x)
-%Compute to str.
+% Convert a numeric value to compact text.
 if abs(x - round(x)) < 1e-12
     s = sprintf('%d', round(x));
 else
@@ -750,14 +750,14 @@ end
 end
 
 function ensure_dir_local(pathName)
-%Create a directory when it is missing.
+% Create a directory when it is missing.
 if ~exist(pathName, 'dir')
     mkdir(pathName);
 end
 end
 
 function tf = is_hybrid_run_usable_local(run, solve_mode, Nc, refine, pdeg)
-%Check whether a hybrid run has field data.
+% Check whether a hybrid run has field data.
 tf = isstruct(run) && isfield(run, 'meta') && isstruct(run.meta) ...
     && isfield(run.meta, 'solve_mode') && strcmpi(string(run.meta.solve_mode), string(solve_mode)) ...
     && isfield(run.meta, 'Nc') && isequal(double(run.meta.Nc), double(Nc)) ...
@@ -768,7 +768,7 @@ tf = isstruct(run) && isfield(run, 'meta') && isstruct(run.meta) ...
 end
 
 function tf = is_single_run_usable_local(run, mode, solve_mode, discValue, pdeg, periodicFlag)
-%Compute single run usable.
+% Check whether a saved run matches the requested configuration.
 tf = isstruct(run) && isfield(run, 'meta') && isstruct(run.meta) ...
     && isfield(run.meta, 'mode') && strcmpi(string(run.meta.mode), string(mode)) ...
     && isfield(run.meta, 'solve_mode') && strcmpi(string(run.meta.solve_mode), string(solve_mode)) ...

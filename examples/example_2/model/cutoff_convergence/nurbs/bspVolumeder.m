@@ -1,8 +1,7 @@
 function [DSu,DSv,DSw]=bspVolumeder(P,U,pu,u,V,pv,v,W,pw,w)
-%Evaluate B-spline volume derivatives.
+% Evaluate B-spline volume derivatives.
 
-%    then we do not need to compute the basis functions again.
-
+% Select the active control points and knot spans.
 uspan=findspan(U,pu,u);
 vspan=findspan(V,pv,v);
 wspan=findspan(W,pw,w);
@@ -11,6 +10,7 @@ ndim=size(P,4); % The dimension of physical domain is 3
 
 temp=P(uspan-pu:uspan,vspan-pv:vspan,wspan-pw:wspan,:);
 
+% Build derivative control nets in each parametric direction.
 ConPtsUbar=zeros(pu,pv+1,pw+1,ndim);
 ConPtsVbar=zeros(pu+1,pv,pw+1,ndim);
 ConPtsWbar=zeros(pu+1,pv+1,pw,ndim);
@@ -53,6 +53,7 @@ for  dim=1:ndim
 end
 
 
+% Evaluate the derivative volume in the u direction.
 Ubar=U;
 Ubar([1,end])=[];
 Nu=bsplinebasis(Ubar,pu-1,u);
@@ -73,6 +74,7 @@ for dim=1:ndim
 end
 
 
+% Evaluate the derivative volume in the v direction.
 Vbar=V;
 Vbar([1,end])=[];
 Nu=bsplinebasis(U,pu,u);
@@ -93,6 +95,7 @@ for dim=1:ndim
 end
 
 
+% Evaluate the derivative volume in the w direction.
 Wbar=W;
 Wbar([1,end])=[];
 Nu=bsplinebasis(U,pu,u);

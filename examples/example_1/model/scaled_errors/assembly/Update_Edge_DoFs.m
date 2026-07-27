@@ -1,5 +1,5 @@
 function nurbs_refine = Update_Edge_DoFs(n_dofs_1,nurbs_refine)
-%Update edge degrees of freedom.
+% Update edge degrees of freedom.
 
 % From Omega_1 to Omega_2, we have to update the index of dofs on Omega_2
 

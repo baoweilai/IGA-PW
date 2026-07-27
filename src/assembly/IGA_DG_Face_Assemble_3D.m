@@ -1,6 +1,7 @@
 function [P,S] = IGA_DG_Face_Assemble_3D(nurbs_original, nurbs_refine, pw_index, plane_wave_dofs_index, L, n_dofs, faceName)
-%Assemble matrices or interface terms for the method.
+% Assemble jump and average operators on one three-dimensional interface face.
 
+% Read the NURBS geometry, refined basis, and element breaks.
 DIM = 3;
 
 ConPts_o   = nurbs_original.ConPts;
@@ -30,7 +31,7 @@ l = nurbs_refine.l;
 S = sparse(n_dofs, n_dofs);
 P = sparse(n_dofs, n_dofs);
 
-% PW basis information
+% Prepare the plane-wave traces and global interface matrices.
 edge_dofs_minus  = plane_wave_dofs_index;
 n_pw_basis       = size(pw_index,1);
 basis_grad_minus = zeros(n_pw_basis, DIM);
@@ -40,6 +41,7 @@ Omega_vol        = L^3;
 % Determine tangential directions on the selected face
 switch faceName
     case {'x-','x+'}
+        % Integrate faces normal to the x direction.
         tangential_breaks_1 = VBreaks;
         tangential_breaks_2 = WBreaks;
         p1 = pv;
@@ -116,6 +118,7 @@ switch faceName
         end
 
     case {'y-','y+'}
+        % Integrate faces normal to the y direction.
         tangential_breaks_1 = UBreaks;
         tangential_breaks_2 = WBreaks;
         p1 = pu;
@@ -192,6 +195,7 @@ switch faceName
         end
 
     case {'z-','z+'}
+        % Integrate faces normal to the z direction.
         tangential_breaks_1 = UBreaks;
         tangential_breaks_2 = VBreaks;
         p1 = pu;
@@ -274,8 +278,8 @@ end
 end
 
 
-function edge_dofs_plus = get_face_dofs_x(faceName, e_v, e_w, m, n, l, pv, pw, knotV, knotW, VBreaks, WBreaks)
-%Return face DOFS x.
+function edge_dofs_plus = get_face_dofs_x(faceName, e_v, e_w, m, n, ~, pv, pw, knotV, knotW, VBreaks, WBreaks)
+% Collect control-point DOFs on an x-normal face.
 jspan = findspan(knotV, pv, VBreaks(e_v));
 kspan = findspan(knotW, pw, WBreaks(e_w));
 
@@ -300,8 +304,8 @@ for kk = 1:(pw+1)
 end
 end
 
-function edge_dofs_plus = get_face_dofs_y(faceName, e_u, e_w, m, n, l, pu, pw, knotU, knotW, UBreaks, WBreaks)
-%Return face DOFS y.
+function edge_dofs_plus = get_face_dofs_y(faceName, e_u, e_w, m, n, ~, pu, pw, knotU, knotW, UBreaks, WBreaks)
+% Collect control-point DOFs on a y-normal face.
 ispan = findspan(knotU, pu, UBreaks(e_u));
 kspan = findspan(knotW, pw, WBreaks(e_w));
 
@@ -327,7 +331,7 @@ end
 end
 
 function edge_dofs_plus = get_face_dofs_z(faceName, e_u, e_v, m, n, l, pu, pv, knotU, knotV, UBreaks, VBreaks)
-%Return face DOFS z.
+% Collect control-point DOFs on a z-normal face.
 ispan = findspan(knotU, pu, UBreaks(e_u));
 jspan = findspan(knotV, pv, VBreaks(e_v));
 
@@ -353,7 +357,7 @@ end
 end
 
 function [basis_plus, basis_grad_plus] = eval_face_basis_x(faceName, u, v, w, knotU, knotV, knotW, pu, pv, pw, DF_plus)
-%Evaluate face basis x.
+% Evaluate basis values and gradients on an x-normal face.
 Uders = bspbasisDers(knotU, pu, u, 1);
 Vders = bspbasisDers(knotV, pv, v, 1);
 Wders = bspbasisDers(knotW, pw, w, 1);
@@ -396,7 +400,7 @@ end
 end
 
 function [basis_plus, basis_grad_plus] = eval_face_basis_y(faceName, u, v, w, knotU, knotV, knotW, pu, pv, pw, DF_plus)
-%Evaluate face basis y.
+% Evaluate basis values and gradients on a y-normal face.
 Uders = bspbasisDers(knotU, pu, u, 1);
 Vders = bspbasisDers(knotV, pv, v, 1);
 Wders = bspbasisDers(knotW, pw, w, 1);
@@ -440,7 +444,7 @@ end
 end
 
 function [basis_plus, basis_grad_plus] = eval_face_basis_z(faceName, u, v, w, knotU, knotV, knotW, pu, pv, pw, DF_plus)
-%Evaluate face basis z.
+% Evaluate basis values and gradients on a z-normal face.
 Uders = bspbasisDers(knotU, pu, u, 1);
 Vders = bspbasisDers(knotV, pv, v, 1);
 Wders = bspbasisDers(knotW, pw, w, 1);
@@ -484,6 +488,6 @@ end
 end
 
 function idx = id3(i,j,k,m,n)
-%Compute id3.
+% Map three tensor indices to one linear index.
 idx = i + (j-1)*m + (k-1)*m*n;
 end

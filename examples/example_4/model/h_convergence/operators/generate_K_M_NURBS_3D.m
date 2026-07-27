@@ -1,5 +1,5 @@
 ﻿function [K, M, meta] = generate_K_M_NURBS_3D(nurbs_original, nurbs_refine, n_gp, opts)
-%Assemble 3-D NURBS stiffness and mass matrices.
+% Assemble 3-D NURBS stiffness and mass matrices.
 arguments
     nurbs_original
     nurbs_refine
@@ -7,6 +7,7 @@ arguments
     opts struct
 end
 
+% Select affine tensor assembly when the geometry supports it.
 use_affine_cube_fast = opts.use_affine_cube_fast;
 [supported, support] = build_affine_cube_fast_support_3D(nurbs_original, nurbs_refine, n_gp);
 
@@ -21,9 +22,10 @@ meta.affine_cube_supported = supported;
 end
 
 function [K, M, meta] = generate_K_M_affine_cube_fast_local(support)
-%Generate k m affine cube fast.
+% Assemble stiffness and mass matrices with affine tensor products.
 t_total = tic;
 
+% Allocate global triplets and timing accumulators.
 Element = support.Element;
 NoEs = support.NoEs;
 n_dofs = support.n_dofs;
@@ -42,6 +44,7 @@ gidx = 1;
 t_local = 0;
 t_scatter = 0;
 
+% Build and scatter each tensor-product element block.
 for kw = 1:wNoEs
     wdata = support.w_cache{kw};
     for jv = 1:vNoEs
@@ -78,6 +81,7 @@ for kw = 1:wNoEs
     end
 end
 
+% Assemble the global sparse matrices and timing data.
 K = sparse(Iind, Jind, Kval, n_dofs, n_dofs);
 M = sparse(Iind, Jind, Mval, n_dofs, n_dofs);
 
@@ -91,6 +95,7 @@ end
 function [Phi, Gx, Gy, Gz, wJ] = build_element_tensor_operators_local( ...
 udata, vdata, wdata, abs_detDF)
 
+% Build tensor-product basis, gradient, and quadrature operators for one element.
 nq_u = numel(udata.phys_pts);
 nq_v = numel(vdata.phys_pts);
 nq_w = numel(wdata.phys_pts);
@@ -116,9 +121,10 @@ end
 end
 
 function [K, M, meta] = generate_K_M_legacy_local(nurbs_original, nurbs_refine, n_gp)
-%Generate k m legacy.
+% Assemble stiffness and mass matrices by element quadrature.
 t_total = tic;
 
+% Read the geometry and refined-mesh data.
 ConPts_o = nurbs_original.ConPts;
 weights_o = nurbs_original.weights;
 knotU_o = nurbs_original.knotU;
@@ -140,6 +146,7 @@ pu = nurbs_refine.pu;
 pv = nurbs_refine.pv;
 pw = nurbs_refine.pw;
 
+% Prepare quadrature and sparse matrix triplets.
 [gp, gw] = grule(n_gp);
 Fhat = @(x, a, b) ((b - a) * x + a + b) / 2;
 
@@ -151,6 +158,7 @@ Jind = Kval;
 
 gidx = 1;
 
+% Integrate each element in physical coordinates.
 for e = 1:NoEs
     Ke = zeros(n_ele_dofs, n_ele_dofs);
     Me = zeros(n_ele_dofs, n_ele_dofs);
@@ -211,6 +219,7 @@ for e = 1:NoEs
         end
     end
 
+    % Store the element blocks in global triplets.
     for i1 = 1:n_ele_dofs
         for j1 = 1:n_ele_dofs
             Iind(gidx) = row(i1);
@@ -222,6 +231,7 @@ for e = 1:NoEs
     end
 end
 
+% Assemble the global sparse matrices and timing data.
 K = sparse(Iind, Jind, Kval, n_dofs, n_dofs);
 M = sparse(Iind, Jind, Mval, n_dofs, n_dofs);
 

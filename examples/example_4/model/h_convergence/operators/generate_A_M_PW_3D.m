@@ -1,6 +1,6 @@
 function [pwData, timing] = generate_A_M_PW_3D( ...
 L, Nc, inner_domains, p_Vr, n_pw_Vr, fft_grid_n, opts)
-%Assemble 3-D plane-wave operators with FFT-Chebyshev correction.
+% Assemble 3-D plane-wave operators with FFT-Chebyshev correction.
 
 arguments
 L
@@ -133,7 +133,7 @@ timing.t_total       = toc(t_total);
 end
 
 function F = interval_ft_general(q, aL, aR, alpha)
-%Compute ft general.
+% Integrate one Fourier mode over an arbitrary interval.
 F = zeros(size(q));
 idx0 = (q == 0);
 F(idx0) = aR - aL;
@@ -145,14 +145,15 @@ end
 function [Vker, VinInner, info] = build_Vker_fullFFT_innerCorrection( ...
 L, N, inner_domains, p_Vr, n_pw_Vr, fft_grid_n, ...
     inner_cheb_n, nuclear_charge)
-%Compute outer potential coefficients from FFT data and Chebyshev correction.
+% Compute outer potential coefficients from FFT data and Chebyshev correction.
+% Prepare the FFT grid and smoothed-potential parameters.
 mFFT = fft_grid_n;
 assert(mFFT >= 4 * N + 1, 'pw_fft_grid_n is too small for this cutoff.');
 
 dx = L / mFFT;
 params = make_hatV_params_3D(L, inner_domains, p_Vr, n_pw_Vr, nuclear_charge);
 
-% ---------- full FFTN ----------
+% Transform the full-cell potential and extract requested frequencies.
 x1d = -L/2 + dx/2 + (0:mFFT-1)*dx;
 t_full_fft = tic;
 vext = build_hatV_grid_vectorized_local(x1d, params);
@@ -185,6 +186,7 @@ for i = 1:Kq
 end
 t_full_fft = toc(t_full_fft);
 
+% Compute and subtract the inner-domain Chebyshev correction.
 t_inner_cheb = tic;
 [VinInner, chebInfo] = build_inner_chebyshev_correction_3D( ...
     L, inner_domains, qvals, inner_cheb_n, ...
@@ -193,6 +195,7 @@ t_inner_cheb = toc(t_inner_cheb);
 
 Vker = Vfull - VinInner;
 
+% Package the grid and timing data.
 info = struct();
 info.mFFT          = mFFT;
 info.dx            = dx;
@@ -203,7 +206,7 @@ info.t_inner_cheb  = t_inner_cheb;
 end
 
 function params = make_hatV_params_3D(L, inner_domains, p_Vr, n_pw_Vr, nuclear_charge)
-%Build parameters for the 3-D smooth potential.
+% Build parameters for the 3-D smooth potential.
 xL = inner_domains(1,1); xR = inner_domains(1,2);
 a = 0.5*(xR - xL);
 
@@ -223,27 +226,8 @@ params.nuclear_charge = nuclear_charge;
 params.g0      = g0;
 end
 
-function Vh = hatV_Example1_3D(x, y, z, params)
-%Compute example1 3D.
-r = sqrt(x^2 + y^2 + z^2);
-
-if r <= params.b
-    Vh = params.g0;
-    return;
-end
-
-if r >= params.a_c
-    Vh = Vr_3D_Example_1(params.p_Vr, params.L, params.n_pw_Vr, x, y, z, params.nuclear_charge);
-    return;
-end
-
-eta   = cutoff_eta(r, params.b, params.a_c);
-Vorig = Vr_3D_Example_1(params.p_Vr, params.L, params.n_pw_Vr, x, y, z, params.nuclear_charge);
-Vh    = (1-eta)*Vorig + eta*params.g0;
-end
-
 function vext = build_hatV_grid_vectorized_local(x1d, params)
-%Evaluate the smooth potential on a grid.
+% Evaluate the smooth potential on a grid.
 mFFT = numel(x1d);
 vext = zeros(mFFT, mFFT, mFFT);
 [Y, Z] = ndgrid(x1d, x1d);
@@ -256,7 +240,7 @@ end
 end
 
 function Vh = hatV_slice_local(x, Y, Z, YZ2, params)
-%Evaluate one slice of the smooth potential.
+% Evaluate one slice of the smooth potential.
 r = sqrt(x ^ 2 + YZ2);
 Vorig = Vr_3D_Example_1_batch_local(x, Y, Z, r, params);
 
@@ -283,7 +267,7 @@ Vh(mask_eta) = (1 - eta(mask_eta)) .* Vorig(mask_eta) + eta(mask_eta) * params.g
 end
 
 function Vh = hatV_Example1_3D_batch(X, Y, Z, params)
-%Compute example1 3D batch.
+% Evaluate the reciprocal-space potential term on an array.
 r = sqrt(X .^ 2 + Y .^ 2 + Z .^ 2);
 Vorig = Vr_3D_Example_1_batch_local(X, Y, Z, r, params);
 
@@ -302,7 +286,7 @@ end
 end
 
 function Vr = Vr_3D_Example_1_batch_local(X, Y, Z, r, params)
-%Compute 3D example 1 batch.
+% Evaluate the 3-D Example 1 potential on an array.
 alpha = 5;
 Omega = params.L ^ 3;
 r_safe = max(r, 1e-14);
@@ -330,32 +314,20 @@ end
 Vr = real(Vr + params.nuclear_charge * 2 * alpha / sqrt(pi));
 end
 
-function eta = cutoff_eta(r, b, a_c)
-%Evaluate the smooth cutoff function.
-if r <= b
-    eta = 1;
-elseif r >= a_c
-    eta = 0;
-else
-    t = (r - b) / (a_c - b);
-    eta = 1 - smooth_step_theta(t);
-end
-end
-
 function th = smooth_step_theta(t)
-%Evaluate the smooth step function.
+% Evaluate the smooth step function.
 th = sfun(t) ./ (sfun(t) + sfun(1 - t));
 end
 
 function y = sfun(t)
-%Evaluate the transition polynomial.
+% Evaluate the transition polynomial.
 y = zeros(size(t));
 idx = (t > 0);
 y(idx) = exp(-1 ./ t(idx));
 end
 
 function A = embed_center(X, convN)
-%Embed a smaller array at the grid center.
+% Embed a smaller array at the grid center.
 A = zeros(convN, convN, convN);
 K = size(X,1);
 i0 = floor((convN - K)/2) + 1;
@@ -363,6 +335,6 @@ A(i0:i0+K-1, i0:i0+K-1, i0:i0+K-1) = X;
 end
 
 function Ksym = hermitize_kernel_3d(K)
-%Compute kernel 3D.
+% Enforce Hermitian symmetry on a centered 3-D kernel.
 Ksym = 0.5 * (K + conj(K(end:-1:1, end:-1:1, end:-1:1)));
 end

@@ -1,5 +1,5 @@
 function [rho_pw_grid, dx] = sample_rho_pw_grid(cA, k_pw, L, a, m)
-%Sample the plane-wave density on a grid.
+% Sample the plane-wave density on a grid.
 
 dx = L / m;
 Omega_area = L * L;

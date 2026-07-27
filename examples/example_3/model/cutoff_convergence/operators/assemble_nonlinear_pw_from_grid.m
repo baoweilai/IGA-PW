@@ -1,5 +1,5 @@
 function N_pw = assemble_nonlinear_pw_from_grid(k_pw, rho_pw_grid, ~)
-%Assemble matrices or interface terms for the method.
+% Assemble the plane-wave nonlinear operator from sampled density.
 
 m = size(rho_pw_grid, 1);
 n_pw = size(k_pw, 1);

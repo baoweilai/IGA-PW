@@ -1,7 +1,7 @@
 function L2_err =  IGA_2D_L2_Error( Refinement, Example, t, Nc, n_eigenvalues  )
-%Compute the 2-D IGA L2 error.
+% Compute the 2-D IGA L2 error.
 
-%% Section
+% Build the circular plane-wave index set.
 DIM = 2;
 n_pw_basis = 0; % number of basis satisfying |k|<=Nc
 N=floor(Nc);
@@ -80,42 +80,26 @@ end
 
 nurbs_refine_domains = cell(n_nurbs_patch,1);
 for e = 1:n_nurbs_patch
-    [knotU,knotV]  = IGADegreeElevSurface(knotU,knotV,t); % Now we should consider the ratio of lengths in x- and y-directions
+    [knotU,knotV]  = IGADegreeElevSurface(knotU,knotV,t); % Elevate both parametric degrees by the requested order.
     pu = nurbs_original{e}.pu + t;     pv = nurbs_original{e}.pv + t;
     nurbs_refine_domains{e} = IGA_2D_Grid(knotU,knotV,pu,pv, Refinement, Example);
 end
 
-%% Now n_dofs is the total number of DOFs in the inner domains
+%% Accumulate global degree-of-freedom offsets across patches
 n_dofs = nurbs_refine_domains{1}.n_dofs_domains;
 for e = 1:(n_nurbs_patch-1)
     nurbs_refine_domains{e+1}.n_dofs_domains  = nurbs_refine_domains{e+1}.n_dofs_domains + n_dofs;
     n_dofs =  nurbs_refine_domains{e+1}.n_dofs_domains;
 end
 
-for e = 2:n_nurbs_patch % Update the the dofs information that is across the boundary of two sub-domains
+for e = 2:n_nurbs_patch % Merge degrees of freedom shared by adjacent patches.
     nurbs_refine_domains{e} = Update_Edge_DoFs( nurbs_refine_domains{e-1}.n_dofs_domains, nurbs_refine_domains{e}   );
 end
-
-% For the periodized Vr
-n_pw_Vr = 0; % number of basis satisfying |k|<=Nc
-N = 2;
-p_Vr = zeros((2*N+1)^2,DIM);
-for ii = -N:N
-    m = sqrt(N^2 - ii^2);
-    m = floor(m);
-    for j=-m:m
-        n_pw_Vr = n_pw_Vr + 1;
-        p_Vr(n_pw_Vr,:)=[ii,j];
-    end
-end
-p_Vr = p_Vr(1:n_pw_Vr,:);
-
-n_dofs_nurbs = n_dofs;
 
 %%  Current uh
 uh_filename   =  strcat('./Numerical Results/EigenFunction_Data/',Example,'/Nc_',num2str(Nc), '/p_',strcat(num2str(pu)));
 uh_filename   =  strcat( strcat(uh_filename,'/uh_'),num2str(Refinement));
-load(uh_filename)
+load(uh_filename, 'uh')
 current_uh = uh;
 
 
@@ -143,9 +127,9 @@ elseif strcmp(Example,'Example_3')
     ref_uh_filename   =  strcat(ref_uh_filename,'.mat');
 end
 
-load(ref_nurbs_filename)
+load(ref_nurbs_filename, 'nurbs')
 ref_nurbs = nurbs;
-load(ref_uh_filename)
+load(ref_uh_filename, 'uh')
 ref_uh = uh;
 
 L2_err_Max = zeros(n_nurbs_patch,n_eigenvalues);

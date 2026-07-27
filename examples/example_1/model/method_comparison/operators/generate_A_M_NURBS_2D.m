@@ -1,6 +1,7 @@
 ﻿function [A, M, meta] = generate_A_M_NURBS_2D( ...
 nurbs_original, nurbs_refine, p_Vr, n_pw_Vr, L, n_gp, Example, varargin)
 
+% Assemble the two-dimensional NURBS stiffness and mass matrices.
 opts = struct();
 if ~isempty(varargin)
     opts = varargin{1};
@@ -27,9 +28,11 @@ end
 function [A, M, meta] = generate_A_M_NURBS_2D_square_fast_local( ...
 nurbs_refine, p_Vr, n_pw_Vr, L, n_gp, geom)
 
+% Assemble square-patch NURBS matrices with tensor operators.
 t_total = tic;
 t_precompute = tic;
 
+% Read the mesh data and precompute one-dimensional basis tables.
 Element = nurbs_refine.Element;
 knotU = nurbs_refine.Ubar;
 knotV = nurbs_refine.Vbar;
@@ -52,6 +55,7 @@ v_cache = precompute_basis_line_local(VBreaks, knotV, pv, gp, gw, geom.y0, geom.
 
 t_precompute = toc(t_precompute);
 
+% Allocate sparse triplets and timing accumulators.
 A_value = zeros(NoEs * n_local_entries, 1);
 M_value = zeros(NoEs * n_local_entries, 1);
 row_index = zeros(NoEs * n_local_entries, 1);
@@ -63,6 +67,7 @@ t_potential = 0;
 t_local_matrix = 0;
 t_scatter = 0;
 
+% Build and scatter each tensor-product element block.
 for jv = 1:vNoEs
     vdata = v_cache{jv};
     for iu = 1:uNoEs
@@ -101,6 +106,7 @@ for jv = 1:vNoEs
     end
 end
 
+% Assemble the global sparse matrices and timing data.
 A = sparse(row_index, column_index, A_value, n_dofs, n_dofs);
 M = sparse(row_index, column_index, M_value, n_dofs, n_dofs);
 
@@ -119,6 +125,7 @@ end
 function [Phi, Gx, Gy, wJ, x_pts, y_pts] = build_element_tensor_operators_local( ...
 udata, vdata, abs_detDF)
 
+% Build tensor-product basis, gradient, and quadrature operators for one element.
 n_gp_u = numel(udata.phys_pts);
 n_gp_v = numel(vdata.phys_pts);
 n_gp_total = n_gp_u * n_gp_v;
@@ -141,7 +148,7 @@ end
 end
 
 function cache = precompute_basis_line_local(Breaks, knot, p, gp, gw, phys0, physScale)
-%Compute basis line.
+% Precompute one-dimensional basis values, derivatives, and weights.
 
 n_ele = numel(Breaks) - 1;
 n_gp = numel(gp);
@@ -170,7 +177,7 @@ end
 end
 
 function Vr = Vr_2D_Example_1_batch_local(p, n_pw, L, x, y)
-%Compute 2D example 1 batch.
+% Evaluate the Example 1 potential at a batch of 2-D points.
 
 p = p * (2 * pi / L);
 pts = [x(:), y(:)];
@@ -197,10 +204,12 @@ end
 end
 
 function [A, M, meta] = generate_A_M_NURBS_2D_legacy_local( ...
-nurbs_original, nurbs_refine, p_Vr, n_pw_Vr, L, n_gp, Example) %#ok<INUSD>
+nurbs_original, nurbs_refine, p_Vr, n_pw_Vr, L, n_gp, ~)
 
+% Assemble the two-dimensional NURBS matrices by element quadrature.
 t_total = tic;
 
+% Read the geometry and refined-mesh data.
 ConPts_o = nurbs_original.ConPts;
 weights_o = nurbs_original.weights;
 knotU_o = nurbs_original.knotU;
@@ -229,6 +238,7 @@ row_index = A_value;
 column_index = A_value;
 global_index = 1;
 
+% Integrate stiffness, mass, and potential terms on each element.
 for e = 1:NoEs
     Ae = 0 * Ae;
     Me = 0 * Me;
@@ -274,6 +284,7 @@ for e = 1:NoEs
     end
 end
 
+% Assemble the global sparse matrices and timing data.
 A = sparse(row_index, column_index, A_value, n_dofs, n_dofs);
 M = sparse(row_index, column_index, M_value, n_dofs, n_dofs);
 
@@ -283,7 +294,7 @@ meta.t_total = toc(t_total);
 end
 
 function [tf, geom] = detect_affine_square_geometry_local(nurbs_original)
-%Detect affine geometry for a square patch.
+% Detect affine geometry for a square patch.
 
 geom = struct('x0', 0, 'y0', 0, 'sx', 0, 'sy', 0);
 tf = false;

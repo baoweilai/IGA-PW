@@ -1,6 +1,7 @@
 function [A,M] = generate_A_M_NURBS_3D(nurbs_original, nurbs_refine, p_Vr, n_pw_Vr, L, n_gp, Example)
-%Generate a m NURBS 3D.
+% Assemble the three-dimensional NURBS stiffness and mass matrices.
 
+% Read the geometry and refined-mesh data.
 ConPts_o   = nurbs_original.ConPts;
 weights_o  = nurbs_original.weights;
 knotU_o    = nurbs_original.knotU;
@@ -22,6 +23,7 @@ pu = nurbs_refine.pu;
 pv = nurbs_refine.pv;
 pw = nurbs_refine.pw;
 
+% Prepare quadrature and sparse matrix triplets.
 [gp,gw] = grule(n_gp);
 Fhat = @(x,a,b) ((b-a)*x + a + b)/2;
 
@@ -34,6 +36,7 @@ col_idx = zeros(NoEs*n_ele_dofs*n_ele_dofs,1);
 
 gidx = 1;
 
+% Integrate the local matrices over each physical element.
 for e = 1:NoEs
     Ae = zeros(n_ele_dofs,n_ele_dofs);
     Me = zeros(n_ele_dofs,n_ele_dofs);
@@ -104,6 +107,7 @@ for e = 1:NoEs
         end
     end
 
+    % Store the element blocks in global triplets.
     for i1 = 1:n_ele_dofs
         for j1 = 1:n_ele_dofs
             row_idx(gidx) = row(i1);
@@ -115,6 +119,7 @@ for e = 1:NoEs
     end
 end
 
+% Assemble and symmetrize the global matrices.
 A = sparse(row_idx, col_idx, A_value, n_dofs, n_dofs);
 M = sparse(row_idx, col_idx, M_value, n_dofs, n_dofs);
 

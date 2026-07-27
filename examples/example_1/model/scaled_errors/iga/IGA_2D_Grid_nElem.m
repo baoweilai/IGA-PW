@@ -1,10 +1,10 @@
-function nurbsInfo = IGA_2D_Grid_nElem(knotU,knotV,pu,pv,nElem)
-%Build a 2-D IGA grid with fixed element counts.
+function nurbsInfo = IGA_2D_Grid_nElem(~,~,pu,pv,nElem)
+% Build a 2-D IGA grid with fixed element counts.
 
 % build open-uniform knot vectors with nElem elements
 Ubar = build_open_uniform_knot(pu, nElem);
 Vbar = build_open_uniform_knot(pv, nElem);
-dof  = []; %#ok<NASGU>
+dof  = [];
 
 nurbsInfo.Ubar=Ubar;
 nurbsInfo.Vbar=Vbar;
@@ -322,7 +322,7 @@ nurbsInfo.right_dofs_2nd_layer  = right_dofs_2nd_layer;
 end
 
 function U = build_open_uniform_knot(p, nElem)
-%Build open uniform knot.
+% Build an open uniform knot vector for the requested mesh.
 if nElem < 1 || round(nElem) ~= nElem
     error('nElem must be a positive integer.');
 end
@@ -336,7 +336,7 @@ end
 end
 
 function span = findspan_local_grid(U, p, u)
-%Locate an index or object used by the computation.
+% Find the active knot span for a parameter value.
 n = length(U) - p - 2;
 
 if u >= U(n+2)

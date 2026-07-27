@@ -1,5 +1,5 @@
 function nurbsInfo = IGA_2D_Grid(knotU,knotV,pu,pv,Refinement)
-%Build the 2-D IGA mesh data.
+% Build the 2-D IGA mesh data.
 
 [Ubar,Vbar,dof]=IGAknotRefineSurface(knotU,knotV, pu,pv,Refinement);
 
@@ -12,8 +12,6 @@ VBreaks =unique(Vbar);
 
 nurbsInfo.UBreaks=UBreaks;
 nurbsInfo.VBreaks=VBreaks;
-
-% ----- Uspan(end)=Uspan(end)-pu-1;Vspan(end)=Vspan(end)-pv-1;
 
 m=length(Ubar)-pu-1;
 n=length(Vbar)-pv-1;
@@ -45,7 +43,7 @@ Coordinate=zeros(NoEs,4);
 Neighbour = zeros(uNoEs,4);
 
 
-%%  For bottom edge
+% Build bottom-boundary DOF maps.
 
 u_ele_dofs = pu+1;
 
@@ -80,7 +78,7 @@ for e = 1:uNoEs
 end
 
 
-%%  For top edge
+% Build top-boundary DOF maps.
 
 u_ele_dofs = pu+1;
 
@@ -114,7 +112,7 @@ for e = 1:uNoEs
 end
 
 
-%%  For left edge
+% Build left-boundary DOF maps.
 
 v_ele_dofs = pv + 1;
 left_edge_dofs     = zeros(vNoEs,2*v_ele_dofs); % [DOFs on edge, DOFs near edge]
@@ -147,7 +145,7 @@ for e = 1:vNoEs
 end
 
 
-%%  For right edge
+% Build right-boundary DOF maps.
 
 v_ele_dofs = pv + 1;
 right_edge_dofs     = zeros(vNoEs,2*v_ele_dofs); % [DOFs on edge, DOFs near edge]

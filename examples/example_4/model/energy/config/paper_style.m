@@ -1,5 +1,5 @@
 ﻿function cfg = paper_style()
-%Return fixed plotting style values.
+% Return fixed plotting style values.
 cfg.fontName = 'Times New Roman';
 cfg.lineColors = [223 122 094; 060 064 091; 130 178 154; 242 204 142] / 255;
 cfg.lineWidth = 2.0;

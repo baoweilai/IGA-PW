@@ -1,8 +1,5 @@
 function [P,S] =  IGA_DG_Bottom_Edge_Assemble(nurbs_original, nurbs_refine, pw_index,plane_wave_dofs_index, L,  n_dofs)
-%Assemble matrices or interface terms for the method.
-
-% Now the two sub-domains are the upper one (v=0)  and lower one (v=1), the
-% interface is at v = 0 for upper one, and v = 1 for the upper one
+% Couple the inner bottom boundary to the outer plane-wave region.
 
 DIM = 2;
 
@@ -45,11 +42,11 @@ end
 n_gp = length(gp);
 
 
-% As the interface is v = 0, so we consider v = 0
+% Fix the boundary parameter at v = 0.
 
 v_bottom_inner = 0;  % The bottom boundary edge of inner domain, v = 0
 
-%% For plane wave functions
+% Initialize plane-wave traces.
 edge_dofs_minus  =  plane_wave_dofs_index;
 n_pw_basis       =  size(pw_index,1);
 basis_grad_minus =  zeros(n_pw_basis,DIM);

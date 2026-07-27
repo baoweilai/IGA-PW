@@ -1,29 +1,39 @@
 function run_reference()
-%Build the fine-grid solution used by the DG error curve.
+% Build the fine-grid solution used by the DG error curve.
 
 clc; close all;
 
+% Set project paths and the workflow data directory.
 exampleDir = fileparts(fileparts(fileparts(mfilename('fullpath'))));
+projectDir = fileparts(fileparts(exampleDir));
+utilsDir = fullfile(projectDir, 'src', 'utils');
+assert(isfolder(utilsDir), 'Missing project utils directory: %s', utilsDir);
+addpath(utilsDir, '-begin');
+primmeDir = fullfile(projectDir, 'external', 'primme', 'Matlab');
+assert(isfolder(primmeDir), 'Missing PRIMME directory: %s', primmeDir);
+addpath(primmeDir, '-begin');
+
 dataDir = fullfile(exampleDir, 'data');
-oldDir = pwd;
-cleanupObj = onCleanup(@() cd(oldDir));
+startDir = pwd;
+cleanupObj = onCleanup(@() cd(startDir));
 cd(dataDir);
 
 add_workflow_paths(fullfile(exampleDir, 'model', 'cutoff_convergence'), ...
-    {'nurbs', 'iga', 'assembly', 'operators', 'core', 'solver'});
+    {'nurbs', 'iga', 'assembly', 'operators', 'core'});
 
+% Set the fine-grid reference parameters.
 Example = 'Example_3';
 Refinement = 7;
 t = 1;
 Nc = 40;
 n_eigenvalues = 1;
 
-beta = 20;
+beta = 100;
 n_gp = 30;
-inner_cheb_n = 100;
-pw_fft_grid_n = 500;
+inner_cheb_n = 150;
+pw_fft_grid_n = 550;
 
-primme_tol = 1e-7;
+primme_tol = 1e-9;
 primme_maxit = 1e8;
 primme_method = 'DEFAULT_MIN_TIME';
 primme_reportLevel = 0;
@@ -32,8 +42,8 @@ eps_diag = 1e-12;
 iface_reg = 1e-12;
 
 scf_maxit = 60;
-scf_pw_grid_m = 500;
-scf_tol_lambda = 1e-6;
+scf_pw_grid_m = 600;
+scf_tol_lambda = 1e-7;
 scf_mixing = 0.9;
 scf_track_n_eigs = 1;
 
@@ -58,6 +68,7 @@ runDir = fullfile(resultRoot, sprintf('refine_%02d', Refinement), ...
     sprintf('p_%d', pdeg), sprintf('Nc_%02d', Nc));
 if ~exist(runDir, 'dir'), mkdir(runDir); end
 
+% Load a complete reference run when it is available.
 runMat = fullfile(runDir, 'run.mat');
 if exist(runMat, 'file')
     S = load(runMat, 'run');
@@ -68,6 +79,7 @@ if exist(runMat, 'file')
     return;
 end
 
+% Solve and save the reference case.
 opts = struct();
 opts.Example = Example;
 opts.beta = beta;

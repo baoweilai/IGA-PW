@@ -1,5 +1,5 @@
 function ders=bspbasisDers(U,p,u,n)
-%Evaluate B-spline basis derivatives.
+% Evaluate B-spline basis derivatives.
 
 ders=zeros(n+1,p+1);
 ndu=AllBasisFuns(U,p,u);
@@ -42,6 +42,3 @@ r=p;
 for k=1:n
     ders(k+1,:)=r*ders(k+1,:);   r=r*(p-k);
 end
-
-
-%% example:

@@ -1,5 +1,5 @@
 function runFile = dg_case_file(rootDir, studyName, Nc, pdeg, nElem)
-%Return the DG error data filename.
+% Return the DG error data filename.
 arguments
     rootDir
     studyName

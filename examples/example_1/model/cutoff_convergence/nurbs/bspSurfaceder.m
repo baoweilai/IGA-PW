@@ -1,5 +1,5 @@
 function [DSu,DSv]=bspSurfaceder(P,U,p,u,V,q,v)
-%Evaluate B-spline surface derivatives.
+% Evaluate B-spline surface derivatives.
 
 uspan=findspan(U,p,u);
 vspan=findspan(V,q,v);
@@ -16,9 +16,8 @@ for  i=1:ndim
     ConPtsVbar(:,:,i)=q*(temp(:,2:end,i)-temp(:,1:end-1,i))./tempV;
 end
 
-%% Section
+% Evaluate the derivative in the u direction.
 Ubar=U;
-% Ubar(1)=[];Ubar(end)=[];
 Ubar([1,end])=[];
 Nu=bsplinebasis(Ubar,p-1,u);
 Nv=bsplinebasis(V,q,v);
@@ -29,9 +28,8 @@ for i=1:ndim
 end
 
 
-%% Section
+% Evaluate the derivative in the v direction.
 Vbar=V;
-% Vbar(1)=[];Vbar(end)=[];
 Vbar([1,end])=[];
 Nu=bsplinebasis(U,p,u);
 Nv=bsplinebasis(Vbar,q-1,v);
@@ -42,8 +40,3 @@ for i=1:ndim
 end
 
 end
-
-%=============================Test======================
-% P(:,:,1)=[0 3 6 9;0 3 6 9;0 3 6 9]';
-% P(:,:,2)=[0 0 0 0;2 2 2 2;4 4 4 4]';
-% P(:,:,3)=[0 3 3 0;2 5 5 2;0 3 3 0]';

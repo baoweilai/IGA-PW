@@ -10,6 +10,7 @@ n_gp
 opts struct
 end
 
+% Select affine tensor assembly when the geometry supports it.
 use_affine_cube_fast = opts.use_affine_cube_fast;
 [supported, support] = build_affine_cube_fast_support_3D(nurbs_original, nurbs_refine, n_gp);
 
@@ -24,9 +25,10 @@ meta.affine_cube_supported = supported;
 end
 
 function [Vmat, meta] = assemble_affine_cube_fast_local(support, Vgrid, L)
-%Assemble matrices or interface terms for the method.
+% Assemble the interpolated potential with affine tensor products.
 t_total = tic;
 
+% Build grid coordinates, sparse triplets, and timing accumulators.
 mFFT = size(Vgrid, 1);
 dx = L / mFFT;
 x1d = -L / 2 + dx / 2 + (0:mFFT-1) * dx;
@@ -49,6 +51,7 @@ t_interp = 0;
 t_local = 0;
 t_scatter = 0;
 
+% Interpolate and integrate the potential on each element.
 for kw = 1:wNoEs
     wdata = support.w_cache{kw};
     for jv = 1:vNoEs
@@ -81,6 +84,7 @@ for kw = 1:wNoEs
     end
 end
 
+% Assemble the global sparse matrix and timing data.
 Vmat = sparse(Iind, Jind, Vval, n_dofs, n_dofs);
 Vmat = 0.5 * (Vmat + Vmat');
 
@@ -95,6 +99,7 @@ end
 function [Phi, wJ, x_pts, y_pts, z_pts] = build_element_tensor_ops_local( ...
 udata, vdata, wdata, abs_detDF)
 
+% Build tensor-product basis and quadrature data for one element.
 nq_u = numel(udata.phys_pts);
 nq_v = numel(vdata.phys_pts);
 nq_w = numel(wdata.phys_pts);
@@ -118,9 +123,10 @@ end
 end
 
 function [Vmat, meta] = assemble_legacy_local(nurbs_original, nurbs_refine, Vgrid, L, n_gp)
-%Assemble matrices or interface terms for the method.
+% Assemble the interpolated potential by element quadrature.
 t_total = tic;
 
+% Read the geometry and refined-mesh data.
 ConPts_o = nurbs_original.ConPts;
 weights_o = nurbs_original.weights;
 knotU_o = nurbs_original.knotU;
@@ -142,6 +148,7 @@ pu = nurbs_refine.pu;
 pv = nurbs_refine.pv;
 pw = nurbs_refine.pw;
 
+% Build grid coordinates, quadrature, and sparse triplets.
 mFFT = size(Vgrid, 1);
 dx = L / mFFT;
 x1d = -L / 2 + dx / 2 + (0:mFFT-1) * dx;
@@ -155,6 +162,7 @@ Iind = Vval;
 Jind = Vval;
 gidx = 1;
 
+% Interpolate and integrate the potential on each element.
 for e = 1:NoEs
     Ve = zeros(n_ele_dofs, n_ele_dofs);
 
@@ -203,6 +211,7 @@ for e = 1:NoEs
         end
     end
 
+    % Store the element block in global triplets.
     for i1 = 1:n_ele_dofs
         for j1 = 1:n_ele_dofs
             Iind(gidx) = row(i1);
@@ -213,6 +222,7 @@ for e = 1:NoEs
     end
 end
 
+% Assemble the global sparse matrix and timing data.
 Vmat = sparse(Iind, Jind, Vval, n_dofs, n_dofs);
 Vmat = 0.5 * (Vmat + Vmat');
 

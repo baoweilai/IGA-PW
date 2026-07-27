@@ -1,5 +1,5 @@
 function plot_h_convergence()
-%Plot h-convergence data.
+% Plot h-convergence data.
 
 clc; close all; format short g;
 
@@ -8,12 +8,14 @@ set(groot, ...
     'defaultLegendInterpreter', 'latex', ...
     'defaultAxesTickLabelInterpreter', 'latex');
 
+prepare_example_2_plot_context(mfilename('fullpath'));
+
 %% ========================= User parameters =============================
 Example  = 'Example_2';
 Nc       = 30;
 p        = 2;
 eig_list = [1 2 3];
-refines_to_plot = 2:6;
+refines_to_plot = 1:5;
 
 refNc     = 45;
 refP      = 3;
@@ -104,7 +106,6 @@ lam    = [T.lambda1, T.lambda2, T.lambda3, T.lambda4];
 fig = plot_one_p2(h, lam, lambda_ref, eig_list, cfg);
 
 figBase = 'h';
-exportgraphics(fig, fullfile(pDir, [figBase '.png']), 'Resolution', 600);
 exportgraphics(fig, fullfile(pDir, [figBase '.pdf']), 'ContentType', 'vector');
 
 err = abs(lam(:, eig_list) - lambda_ref(1, eig_list));
@@ -119,7 +120,7 @@ for j = 1:numel(eig_list)
     fprintf('\n');
 end
 
-Rows = {};
+Rows = cell(numel(eig_list) * size(ord, 1), 6);
 rowCount = 0;
 
 for j = 1:numel(eig_list)
@@ -146,12 +147,14 @@ fprintf('[Saved] %s\n', out_mat);
 end
 
 function fig = plot_one_p2(h, lam, lambda_ref, eig_list, cfg)
-%Plot one p2.
+% Plot the quadratic-degree convergence curves.
 
+% Compute and order the selected eigenvalue errors.
 err = abs(lam(:, eig_list) - lambda_ref(1, eig_list));
 [h, idx] = sort(h(:), 'ascend');
 err = err(idx, :);
 
+% Create the logarithmic convergence axes.
 fig = figure('Color', cfg.fig.bgColor, ...
     'Units', 'inches', ...
     'Position', [1 1 cfg.fig.width cfg.fig.height], ...
@@ -168,6 +171,7 @@ ax.Position = [ ...
     1 - cfg.layout.left - cfg.layout.right, ...
     1 - cfg.layout.bottom - cfg.layout.top];
 
+% Draw one error curve for each selected eigenvalue.
 hEig = gobjects(1, numel(eig_list));
 for j = 1:numel(eig_list)
     hEig(j) = plot(ax, h, err(:,j), '-', ...
@@ -194,6 +198,7 @@ grid(ax, 'off');
 xlabel(ax, cfg.xlabel, 'FontSize', cfg.axes.labelSize);
 ylabel(ax, cfg.ylabel, 'FontSize', cfg.axes.labelSize);
 
+% Construct the second- and fourth-order reference curves.
 anchor = max(2, min(numel(h)-1, round(numel(h)/2)));
 h0 = h(anchor);
 make_ref = @(q, y0) (y0 / h0^q) * h.^q;
@@ -211,6 +216,7 @@ hOrder4 = plot(ax, h, yref4, cfg.orderLS, ...
 
 yAll = [err(:); yref2(:); yref4(:)];
 
+% Set plot bounds and draw the manual legend entries.
 set(ax, ...
     'XLim', [min(h)/(1+cfg.padX), max(h)*(1+cfg.padX)], ...
     'YLim', [min(yAll)/(1+cfg.padYLow), max(yAll)*(1+cfg.padYHigh)]);
@@ -232,7 +238,7 @@ end
 end
 
 function draw_fake_entry(ax, hLine, x1n, x2n, xtn, yn, labelStr, cfg)
-%Draw fake entry.
+% Add an in-axes legend entry using a proxy line.
 
 c  = get(hLine, 'Color');
 ls = get(hLine, 'LineStyle');
@@ -273,7 +279,7 @@ text(ax, xt, yt, labelStr, ...
 end
 
 function [x, y] = axes_norm_to_data(ax, xn, yn)
-%Compute norm to data.
+% Convert normalized axes coordinates to data coordinates.
 
 xlimv = ax.XLim;
 ylimv = ax.YLim;
@@ -284,14 +290,32 @@ y = 10^(log10(ylimv(1)) + yn * diff(log10(ylimv)));
 end
 
 function ord = local_orders_matrix(h, err)
-%Compute orders matrix.
+% Compute observed convergence orders between adjacent mesh sizes.
 
 ord = log(err(2:end,:) ./ err(1:end-1,:)) ./ log(h(2:end) ./ h(1:end-1));
 
 end
 
+function prepare_example_2_plot_context(scriptFile)
+% Prepare paths relative to this example script.
+
+figuresDir = fileparts(scriptFile);
+exampleDir = fileparts(figuresDir);
+projectDir = fileparts(fileparts(exampleDir));
+utilsDir   = fullfile(projectDir, 'src', 'utils');
+dataDir    = fullfile(exampleDir, 'data');
+
+assert(isfolder(utilsDir), 'Missing utility directory: %s', utilsDir);
+assert(isfolder(dataDir), 'Missing data directory: %s', dataDir);
+
+addpath(utilsDir, '-begin');
+add_example_paths(exampleDir);
+cd(dataDir);
+
+end
+
 function y = round_sig(x, nSig)
-%Round a value to significant digits.
+% Round a value to significant digits.
 
 y = x;
 mask = isfinite(x) & (x ~= 0);

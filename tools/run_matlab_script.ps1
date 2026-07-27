@@ -8,11 +8,13 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ExitFile,
 
-    [string]$MatlabExe = 'C:\Matlab2025a\bin\matlab.exe'
+    [string]$MatlabExe = (Get-Command matlab.exe -ErrorAction Stop).Source
 )
 
+# Build the batch command for the supplied MATLAB script.
 $matlabCommand = "run('$ScriptFile');"
 
+# Run MATLAB and record its process exit code.
 & $MatlabExe -batch $matlabCommand *> $LogFile
 $exitCode = $LASTEXITCODE
 

@@ -1,5 +1,5 @@
 function [S,DF,W,DW]=NurbsVolume(ConPts,weights,knotU,pu,u,knotV,pv,v,knotW,pw,w)
-%Evaluate a NURBS volume.
+% Evaluate a NURBS volume.
 
 
 ndim=size(ConPts,4);

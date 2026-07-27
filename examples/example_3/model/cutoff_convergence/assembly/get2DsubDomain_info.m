@@ -1,5 +1,5 @@
 function dg_2D_domains_idx = get2DsubDomain_info(mp)
-%Build the 2-D subdomain connectivity data.
+% Build the 2-D subdomain connectivity data.
 nx = mp.nx;
 ny = mp.ny;
 %% For elements from left to right, layer to layer format

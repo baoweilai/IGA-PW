@@ -1,5 +1,5 @@
 function prec = build_interface_block_prec_3D(Ag, gamma, eta, diag_eta, n_total, opts)
-%Build the 3-D interface-block preconditioner.
+% Build the 3-D interface-block preconditioner.
 arguments
     Ag
     gamma
@@ -35,14 +35,14 @@ prec.apply = @(x) apply_interface_block_prec_local(x, gamma, eta, prec.dinv_eta,
 end
 
 function y = apply_interface_block_prec_local(x, gamma, eta, dinv_eta, solve_gamma, factor_type)
-%Apply the interface-block preconditioner.
+% Apply the interface-block preconditioner.
 y = zeros(size(x));
 y(eta, :) = bsxfun(@times, x(eta, :), dinv_eta);
 y(gamma, :) = solve_gamma_block(solve_gamma, factor_type, x(gamma, :));
 end
 
 function [solve_gamma, factor_type] = factorize_gamma_block(Areg)
-%Factor the interface block.
+% Factor the interface block.
 [R, pflag] = chol(Areg);
 if pflag == 0
     solve_gamma = struct('R', R);
@@ -55,7 +55,7 @@ end
 end
 
 function y = solve_gamma_block(solve_gamma, factor_type, x)
-%Apply the interface-block factorization.
+% Apply the interface-block factorization.
 switch factor_type
     case 'chol'
         y = solve_gamma.R \ (solve_gamma.R' \ x);

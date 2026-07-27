@@ -1,11 +1,12 @@
 function run_cutoff_data()
-%Generate Example 1 cutoff-convergence data.
+% Generate Example 1 cutoff-convergence data.
 
 clc; close all;
 
+% Set workflow paths, parameters, and cache directories.
 activate_example_workflow('cutoff_convergence', ...
     {'nurbs', 'dg', 'iga', 'assembly', ...
-    'operators', 'error_norms', 'core', 'solver'});
+    'operators', 'error_norms', 'core'});
 exampleDir = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 rootDir = fullfile(exampleDir, 'data');
 oldDir = pwd;
@@ -21,7 +22,7 @@ n_eigenvalues   = 6;
 
 beta = 20;
 n_gp = 20;
-inner_cheb_n = 48;
+inner_cheb_n = 200;
 pw_fft_grid_n = 256;
 
 primme_tol         = 1e-13;
@@ -47,6 +48,7 @@ if ~exist(cacheRootPW, 'dir'), mkdir(cacheRootPW); end
 cacheRootRef = fullfile(resultRoot, 'cache_refine');
 if ~exist(cacheRootRef, 'dir'), mkdir(cacheRootRef); end
 
+% Solve each polynomial degree, refinement, and cutoff case.
 for t = t_list
     pdeg = 1 + t;
 
@@ -108,6 +110,7 @@ for t = t_list
             solve_iga_pw_dg(refine, t, Nc, n_eigenvalues, opts);
         end
 
+        % Collect and save the cutoff results for this refinement.
         summaryCsv = fullfile(refineCacheDir, 'summary.csv');
         LamNc = zeros(numel(Nc_list), n_eigenvalues);
         DofNc = zeros(numel(Nc_list), 1);
@@ -134,7 +137,7 @@ end
 end
 
 function run = load_run(runMat, n_eigs)
-%Read one completed cutoff case.
+% Read one completed cutoff case.
 
 S = load(runMat, 'run');
 assert(isfield(S, 'run'), 'Missing run structure in %s.', runMat);
@@ -145,7 +148,7 @@ assert(isfield(run, 'n_dofs_total'), 'Missing total DOFs in %s.', runMat);
 end
 
 function assert_valid_runmat(runMat, n_eigs)
-%Check the cached run file used by cutoff data.
+% Check the cached run file used by cutoff data.
 
 run = load_run(runMat, n_eigs);
 assert(isfield(run, 'meta') && isfield(run.meta, 'prec_type'), ...

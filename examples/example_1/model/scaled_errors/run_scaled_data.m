@@ -1,47 +1,48 @@
 function run_scaled_data()
-%Run scaled data.
+% Generate Example 1 scaled-error data.
 
 clc; close all; format short e;
 
+% Set workflow paths and the data directory.
 activate_example_workflow('scaled_errors', ...
     {'nurbs', 'dg', 'iga', 'assembly', ...
-    'operators', 'error_norms', 'core', 'solver'});
+    'operators', 'error_norms', 'core'});
 exampleDir = fileparts(fileparts(fileparts(mfilename('fullpath'))));
 dataDir = fullfile(exampleDir, 'data');
 oldDir = pwd;
 cleanupObj = onCleanup(@() cd(oldDir));
 cd(dataDir);
 
-% ---------------- user params ----------------
+% Set the scaling and discretization parameters.
 Example       = 'Example_1';
-alpha_list    = [1.0, 1.5, 2.0, 2.5];
+alpha_list    = [1.0, 2.0];
 nElem_list    = [2 4 8 12 16];
 
-% current runs: p = 1, 2
-t_list        = [0, 1];     % p = 1+t -> [1,2]
+% Use degree p = 2.
+t_list        = 1;
 
-n_eigenvalues = 1;
+n_eigenvalues = 4;
 
 Nc_base       = 4;
 beta          = 20;
 n_gp          = 10;
-inner_cheb_n  = 48;
-pw_fft_grid_n = 256;
+inner_cheb_n  = 100;
+inner_quad_n  = 400;
+pw_fft_grid_n = 500;
 
-% ---------- existing reference file (fixed p=3) ----------
-refRunMat      = fullfile(pwd, 'result', 'Example_1_verify49', ...
-    'reference', 'p_3', 'refine_06_Nc_48', 'run.mat');
-refNcFallback  = 48;
+% Set the saved four-vector reference.
+refRunMat      = fullfile(pwd, 'result', 'Example_1', 'Nc_45', ...
+    'p_3', 'refine_08', 'run.mat');
 ref_pdeg       = 3;
 
-% error evaluation grid
+% Set the error quadrature grid.
 L              = 4;
 a              = 0.2;
 dx_in          = 1e-2;
 dx_out         = 1e-2;
 chunkSize      = 10000;
 
-% PRIMME
+% Set the eigensolver parameters.
 primme_tol         = 1e-12;
 primme_maxit       = 5e7;
 primme_method      = 'DEFAULT_MIN_TIME';
@@ -49,31 +50,33 @@ primme_reportLevel = 0;
 eps_diag           = 1e-12;
 iface_reg          = 1e-12;
 
-% save controls
+% Set the saved run fields.
 save_eigenvectors = true;
 save_nurbs        = true;
 save_pw_index     = true;
 use_pw_cache      = true;
 
-% ---------------- result root ----------------
+% Create the result and cache directories.
 resultRoot = fullfile(pwd, 'result', 'scaled_errors');
 if ~exist(resultRoot, 'dir'), mkdir(resultRoot); end
 
 cacheRoot = fullfile(resultRoot, 'cache_pw');
 if ~exist(cacheRoot, 'dir'), mkdir(cacheRoot); end
 
-% ---------------- load existing reference ----------------
+% Load the reference eigenvectors.
 if ~exist(refRunMat, 'file')
     error('Reference file not found:\n%s', refRunMat);
 end
 
 fprintf('[LOAD REF] %s\n', refRunMat);
-ref = load_run_data(refRunMat, refNcFallback);
+ref = load_run_data(refRunMat);
+assert(size(ref.uh, 2) >= n_eigenvalues, ...
+    'Reference file must contain the first four eigenvectors.');
 ref.u  = ref.uh(:,1);
 ref.uI = ref.u(1:ref.nNURBS);
 ref.uA = ref.u(ref.nNURBS+1 : ref.nNURBS + size(ref.k_pw,1));
 
-% ---------------- plan Nc from h ----------------
+% Compute the cutoff associated with each mesh size.
 h0 = 2 * a / nElem_list(1);
 
 fprintf('================ plan (nElem, h, Nc) ================\n');
@@ -88,7 +91,7 @@ for ia = 1:numel(alpha_list)
     end
 end
 
-% loop over p = 1,2
+% Solve the configured degree and scaling cases.
 for it = 1:numel(t_list)
     t = t_list(it);
     pdeg = 1 + t;
@@ -112,10 +115,16 @@ for it = 1:numel(t_list)
         Nc_ok    = [];
         dof_ok   = [];
         lam_ok   = [];
+        lam3_ok  = [];
+        lam4_ok  = [];
         eL2      = [];
         eDG      = [];
+        eL2_u3   = [];
+        eDG_u3   = [];
         rhs49    = [];
         ratio49  = [];
+        rhs49_u3 = [];
+        ratio49_u3 = [];
 
         fprintf('\n============================================================\n');
         fprintf('[ALPHA] alpha = %.2f, gamma = %.6f, current p = %d\n', al, gamma49, pdeg);
@@ -131,11 +140,12 @@ for it = 1:numel(t_list)
 
             opts = make_opts(Example, beta, n_gp, primme_tol, primme_maxit, ...
                 primme_method, primme_reportLevel, eps_diag, iface_reg, save_eigenvectors, save_nurbs, ...
-                save_pw_index, use_pw_cache, cacheRoot, runDir, inner_cheb_n, pw_fft_grid_n);
+                save_pw_index, use_pw_cache, cacheRoot, runDir, inner_cheb_n, inner_quad_n, pw_fft_grid_n);
             opts.mesh_mode = 'nElem';
             opts.nElem     = nElem;
 
-            if ~exist(runMat, 'file')
+            if ~run_matches_parameters(runMat, n_eigenvalues, inner_cheb_n, ...
+                    inner_quad_n, pw_fft_grid_n, pdeg, nElem, Nc)
                 fprintf('\n------------------------------------------------------------\n');
                 fprintf('[RUN ] p = %d, alpha = %.2f, nElem = %d, h = %.6f, Nc = %d\n', ...
                     pdeg, al, nElem, h, Nc);
@@ -145,13 +155,15 @@ for it = 1:numel(t_list)
                     pdeg, al, nElem, h, Nc);
             end
 
-            rr = load_run_data(runMat, Nc);
+            rr = load_run_data(runMat);
+            assert(size(rr.uh, 2) >= n_eigenvalues, ...
+                'Run file contains fewer than four eigenvectors: %s', runMat);
 
             u  = rr.uh(:,1);
             uI = u(1:rr.nNURBS);
             uA = u(rr.nNURBS+1 : rr.nNURBS + size(rr.k_pw,1));
 
-            % phase alignment using common PW modes
+            % Align the first eigenvector using common plane-wave modes.
             [tf, loc] = ismember(rr.k_pw, ref.k_pw, 'rows');
             if ~all(tf)
                 error('Current PW modes are not contained in reference PW modes.');
@@ -172,47 +184,69 @@ for it = 1:numel(t_list)
 
             sigma = beta * (Nc + 1 / max(rr.h, 1e-14));
 
-            errL2 = compute_L2_error( ...
-                rr.nurbs_refine, uI, uA, rr.k_pw, ...
-                ref.nurbs_refine, ref.uI, ref.uA, ref.k_pw, ...
-                L, a, dx_in, dx_out, chunkSize);
+            [uI34, uA34, refI34, refA34] = align_eigenspace34( ...
+                rr, ref, L, a, dx_in, dx_out, chunkSize);
 
-            errDG = compute_DG_error( ...
-                rr.nurbs_refine, uI, uA, rr.k_pw, ...
-                ref.nurbs_refine, ref.uI, ref.uA, ref.k_pw, ...
+            [errL2_pair, errDG_pair] = compute_vector_errors( ...
+                rr.nurbs_refine, [uI, uI34(:,1)], ...
+                [uA, uA34(:,1)], rr.k_pw, ...
+                ref.nurbs_refine, [ref.uI, refI34(:,1)], ...
+                [ref.uA, refA34(:,1)], ref.k_pw, ...
                 L, a, dx_in, dx_out, chunkSize, sigma);
+
+            errL2 = errL2_pair(1);
+            errDG = errDG_pair(1);
+            errL2_u3_now = errL2_pair(2);
+            errDG_u3_now = errDG_pair(2);
 
             rhs_now   = (rr.h ^ gamma49) * errDG;
             ratio_now = errL2 / max(rhs_now, eps);
+            rhs_u3_now = (rr.h ^ gamma49) * errDG_u3_now;
+            ratio_u3_now = errL2_u3_now / max(rhs_u3_now, eps);
 
             nElem_ok(end+1,1) = nElem; %#ok<AGROW>
             h_ok(end+1,1)     = rr.h;  %#ok<AGROW>
             Nc_ok(end+1,1)    = Nc;    %#ok<AGROW>
             dof_ok(end+1,1)   = rr.nDOF; %#ok<AGROW>
             lam_ok(end+1,1)   = real(rr.lambda(1)); %#ok<AGROW>
+            lam3_ok(end+1,1)  = real(rr.lambda(3)); %#ok<AGROW>
+            lam4_ok(end+1,1)  = real(rr.lambda(4)); %#ok<AGROW>
             eL2(end+1,1)      = errL2; %#ok<AGROW>
             eDG(end+1,1)      = errDG; %#ok<AGROW>
+            eL2_u3(end+1,1)   = errL2_u3_now; %#ok<AGROW>
+            eDG_u3(end+1,1)   = errDG_u3_now; %#ok<AGROW>
             rhs49(end+1,1)    = rhs_now; %#ok<AGROW>
             ratio49(end+1,1)  = ratio_now; %#ok<AGROW>
+            rhs49_u3(end+1,1) = rhs_u3_now; %#ok<AGROW>
+            ratio49_u3(end+1,1) = ratio_u3_now; %#ok<AGROW>
 
-            fprintf('[ERR ] p=%d alpha=%.2f nElem=%d h=%.6f Nc=%d : L2=%.3e, DG=%.3e, h^g*DG=%.3e, ratio=%.3e\n', ...
-                pdeg, al, nElem, rr.h, Nc, errL2, errDG, rhs_now, ratio_now);
+            fprintf(['[ERR ] p=%d alpha=%.2f nElem=%d h=%.6f Nc=%d : ' ...
+                'u1[L2=%.3e DG=%.3e h^gDG=%.3e] ' ...
+                'u3[L2=%.3e DG=%.3e h^gDG=%.3e]\n'], ...
+                pdeg, al, nElem, rr.h, Nc, errL2, errDG, rhs_now, ...
+                errL2_u3_now, errDG_u3_now, rhs_u3_now);
         end
 
+        % Save the errors for this scaling exponent.
         T = table(repmat(al, numel(nElem_ok), 1), repmat(gamma49, numel(nElem_ok), 1), ...
-            nElem_ok, h_ok, Nc_ok, dof_ok, lam_ok, eL2, eDG, rhs49, ratio49, ...
-            'VariableNames', {'alpha','gamma49','nElem','h','Nc','dof','lambda1', ...
-            'u1_L2','u1_DG','h_gamma_DG','ratio49'});
+            nElem_ok, h_ok, Nc_ok, dof_ok, lam_ok, lam3_ok, lam4_ok, ...
+            eL2, eDG, rhs49, ratio49, eL2_u3, eDG_u3, rhs49_u3, ratio49_u3, ...
+            'VariableNames', {'alpha','gamma49','nElem','h','Nc','dof', ...
+            'lambda1','lambda3','lambda4','u1_L2','u1_DG','h_gamma_DG', ...
+            'ratio49','u3_L2','u3_DG','u3_h_gamma_DG','u3_ratio49'});
 
         csvFile = fullfile(caseRoot, 'errors.csv');
         matFile = fullfile(caseRoot, 'errors.mat');
         writetable(T, csvFile);
         save(matFile, 'T', 'al', 'gamma49', 'nElem_list', 'Nc_base', ...
-            'refRunMat', 'refNcFallback', 'ref_pdeg', 'dx_in', 'dx_out', 'chunkSize');
+            'refRunMat', 'ref_pdeg', 'dx_in', 'dx_out', ...
+            'chunkSize', 'n_eigenvalues', 'inner_cheb_n', 'inner_quad_n', ...
+            'pw_fft_grid_n');
 
         Tall = [Tall; T]; %#ok<AGROW>
     end
 
+    % Save the combined degree summary.
     summaryDir = fullfile(resultRoot, sprintf('p_%d', pdeg));
     if ~exist(summaryDir, 'dir'), mkdir(summaryDir); end
     allCsv = fullfile(summaryDir, 'summary.csv');
@@ -223,14 +257,15 @@ end
 
 function opts = make_opts(Example, beta, n_gp, primme_tol, primme_maxit, ...
     primme_method, primme_reportLevel, eps_diag, iface_reg, save_eigenvectors, save_nurbs, ...
-    save_pw_index, use_pw_cache, cacheRoot, outDir, inner_cheb_n, pw_fft_grid_n)
-%Build solver options.
+    save_pw_index, use_pw_cache, cacheRoot, outDir, inner_cheb_n, inner_quad_n, pw_fft_grid_n)
+% Build solver options.
 
 opts = struct();
 opts.Example            = Example;
 opts.beta               = beta;
 opts.n_gp               = n_gp;
 opts.inner_cheb_n       = inner_cheb_n;
+opts.inner_quad_n       = inner_quad_n;
 opts.pw_fft_grid_n      = pw_fft_grid_n;
 
 opts.primme_tol         = primme_tol;
@@ -247,73 +282,45 @@ opts.save_pw_index      = save_pw_index;
 opts.use_pw_cache       = use_pw_cache;
 opts.cacheRoot          = cacheRoot;
 opts.outDir             = outDir;
-
-opts.save_matrices      = false;
-opts.save_mat           = false;
 end
 
 function Nc = choose_Nc_from_h(h, h0, Nc0, alpha)
-%Choose the plane-wave cutoff from the mesh size.
+% Choose the plane-wave cutoff from the mesh size.
 Nc = ceil(Nc0 * (h0 / h)^(1 / alpha));
 Nc = max(2, Nc);
 end
 
 function tag = alpha_to_tag(alpha)
-%Compute to tag.
+% Encode alpha in a filename-safe tag.
 tag = strrep(sprintf('%.2f', alpha), '.', 'p');
 end
 
-function rr = load_run_data(runMat, NcFallback)
-%Load run data.
+function rr = load_run_data(runMat)
+% Load one saved scaled-error run.
 S = load(runMat);
-if isfield(S, 'run')
-    R = S.run;
-else
-    R = S;
-end
-
-if ~isfield(R, 'uh') || isempty(R.uh)
-    error('run.mat does not contain eigenvectors uh:\n%s', runMat);
-end
+assert(isfield(S, 'run'), 'MAT file does not contain run: %s', runMat);
+R = S.run;
+assert(isfield(R, 'uh') && ~isempty(R.uh), ...
+    'run.mat does not contain eigenvectors uh: %s', runMat);
 rr.uh = R.uh;
-
-if ~isfield(R, 'lambda') || isempty(R.lambda)
-    error('run.mat does not contain lambda:\n%s', runMat);
-end
+assert(isfield(R, 'lambda') && ~isempty(R.lambda), ...
+    'run.mat does not contain lambda: %s', runMat);
 rr.lambda = R.lambda(:).';
-
-if isfield(R, 'k_pw') && ~isempty(R.k_pw)
-    rr.k_pw = R.k_pw;
-else
-    [rr.k_pw, ~] = generate_p_vec(NcFallback);
-end
-
-if isfield(R, 'n_dofs_total') && ~isempty(R.n_dofs_total)
-    rr.nDOF = double(R.n_dofs_total);
-elseif isfield(R, 'meta') && isfield(R.meta, 'n_dofs_total')
-    rr.nDOF = double(R.meta.n_dofs_total);
-else
-    rr.nDOF = size(R.uh, 1);
-end
-
-if isfield(R, 'n_dofs_nurbs') && ~isempty(R.n_dofs_nurbs)
-    rr.nNURBS = double(R.n_dofs_nurbs);
-elseif isfield(R, 'meta') && isfield(R.meta, 'n_dofs_nurbs')
-    rr.nNURBS = double(R.meta.n_dofs_nurbs);
-else
-    rr.nNURBS = size(R.uh,1) - size(rr.k_pw,1);
-end
-
-if ~isfield(R, 'nurbs_refine') || isempty(R.nurbs_refine)
-    error('run.mat does not contain nurbs_refine:\n%s', runMat);
-end
+assert(isfield(R, 'k_pw') && ~isempty(R.k_pw), ...
+    'run.mat does not contain k_pw: %s', runMat);
+rr.k_pw = R.k_pw;
+assert(isfield(R, 'n_dofs_total') && ~isempty(R.n_dofs_total), ...
+    'run.mat does not contain n_dofs_total: %s', runMat);
+rr.nDOF = double(R.n_dofs_total);
+assert(isfield(R, 'n_dofs_nurbs') && ~isempty(R.n_dofs_nurbs), ...
+    'run.mat does not contain n_dofs_nurbs: %s', runMat);
+rr.nNURBS = double(R.n_dofs_nurbs);
+assert(isfield(R, 'nurbs_refine') && ~isempty(R.nurbs_refine), ...
+    'run.mat does not contain nurbs_refine: %s', runMat);
 rr.nurbs_refine = R.nurbs_refine;
-
-if isfield(R, 'nurbs_original')
-    rr.nurbs_original = R.nurbs_original;
-else
-    rr.nurbs_original = [];
-end
+assert(isfield(R, 'nurbs_original') && ~isempty(R.nurbs_original), ...
+    'run.mat does not contain nurbs_original: %s', runMat);
+rr.nurbs_original = R.nurbs_original;
 
 if isfield(R, 'meta') && isfield(R.meta, 'h') && ~isempty(R.meta.h)
     rr.h = R.meta.h;
@@ -322,114 +329,142 @@ else
 end
 end
 
-function errL2 = compute_L2_error( ...
-nurbs_curr, uI_curr, uA_curr, k_curr, ...
-    nurbs_ref,  uI_ref,  uA_ref,  k_ref, ...
-    L, a, dx_in, dx_out, chunkSize)
+function tf = run_matches_parameters(runMat, nEigenvalues, innerChebN, ...
+    innerQuadN, fftGridN, pdeg, nElem, Nc)
+% Accept only data generated with the requested eigensolver and PW settings.
+tf = false;
+if exist(runMat, 'file') ~= 2
+    return;
+end
 
-% Compute the L2 error on the comparison grid.
+S = load(runMat, 'run');
+if ~isfield(S, 'run') || ~isfield(S.run, 'meta') || ...
+        ~isfield(S.run, 'uh') || size(S.run.uh, 2) < nEigenvalues
+    return;
+end
+
+meta = S.run.meta;
+required = {'inner_cheb_n', 'inner_quad_n', 'pw_fft_grid_n', ...
+    'pu', 'nElem', 'Nc'};
+if ~all(isfield(meta, required))
+    return;
+end
+
+tf = meta.inner_cheb_n == innerChebN ...
+    && meta.inner_quad_n == innerQuadN ...
+    && meta.pw_fft_grid_n == fftGridN ...
+    && meta.pu == pdeg ...
+    && meta.nElem == nElem ...
+    && meta.Nc == Nc;
+end
+
+function [uI34, uA34, refI34, refA34] = align_eigenspace34( ...
+    curr, ref, L, a, dx_in, dx_out, chunkSize)
+% L2-Procrustes alignment of the repeated third/fourth eigenspaces.
+currI = curr.uh(1:curr.nNURBS, 3:4);
+currA = curr.uh(curr.nNURBS + 1:curr.nNURBS + size(curr.k_pw, 1), 3:4);
+refI = ref.uh(1:ref.nNURBS, 3:4);
+refA = ref.uh(ref.nNURBS + 1:ref.nNURBS + size(ref.k_pw, 1), 3:4);
+
 [xi, yi, wA_in] = grid_points_square(-a, a, dx_in);
-vI_curr = iga_eval_val(nurbs_curr, uI_curr, xi, yi, a);
-vI_ref  = iga_eval_val(nurbs_ref,  uI_ref,  xi, yi, a);
-err_in  = sum(abs(vI_curr - vI_ref).^2) * wA_in;
+vCurr = iga_eval_block(curr.nurbs_refine, currI, xi, yi, a);
+vRef = iga_eval_block(ref.nurbs_refine, refI, xi, yi, a);
+Mrr = vRef' * vRef * wA_in;
+Mhh = vCurr' * vCurr * wA_in;
+Mrh = vRef' * vCurr * wA_in;
 
 [xo, yo, wA_out] = grid_points_outer(L, a, dx_out);
-err_out = 0;
-nPts = numel(xo);
-k = 1;
-while k <= nPts
-    k2 = min(nPts, k + chunkSize - 1);
-    X  = xo(k:k2);
-    Y  = yo(k:k2);
-
-    vA_curr = pw_eval_val(uA_curr, k_curr, X, Y, L);
-    vA_ref  = pw_eval_val(uA_ref,  k_ref,  X, Y, L);
-
-    err_out = err_out + sum(abs(vA_curr - vA_ref).^2);
-    k = k2 + 1;
-end
-err_out = err_out * wA_out;
-
-errL2 = sqrt(err_in + err_out);
+for k = 1:chunkSize:numel(xo)
+    idx = k:min(numel(xo), k + chunkSize - 1);
+    vCurr = pw_eval_block(currA, curr.k_pw, xo(idx), yo(idx), L);
+    vRef = pw_eval_block(refA, ref.k_pw, xo(idx), yo(idx), L);
+    Mrr = Mrr + vRef' * vRef * wA_out;
+    Mhh = Mhh + vCurr' * vCurr * wA_out;
+    Mrh = Mrh + vRef' * vCurr * wA_out;
 end
 
-function errDG = compute_DG_error( ...
-nurbs_curr, uI_curr, uA_curr, k_curr, ...
-    nurbs_ref,  uI_ref,  uA_ref,  k_ref, ...
+Rr = chol(hermitian(Mrr));
+Rh = chol(hermitian(Mhh));
+C = Rr' \ (Mrh / Rh);
+[left, ~, right] = svd(C, 'econ');
+Q = right * left';
+
+refI34 = refI / Rr;
+refA34 = refA / Rr;
+uI34 = (currI / Rh) * Q;
+uA34 = (currA / Rh) * Q;
+end
+
+function [errL2, errDG] = compute_vector_errors( ...
+    nurbs_curr, uI_curr, uA_curr, k_curr, ...
+    nurbs_ref, uI_ref, uA_ref, k_ref, ...
     L, a, dx_in, dx_out, chunkSize, sigma)
-
-% Compute the DG error on the comparison grid.
+% Compute L2 and broken-H1-plus-jump errors for several aligned vectors.
 [xi, yi, wA_in] = grid_points_square(-a, a, dx_in);
-[vI_curr, gxI_curr, gyI_curr] = iga_eval_val_grad(nurbs_curr, uI_curr, xi, yi, a);
-[vI_ref,  gxI_ref,  gyI_ref ] = iga_eval_val_grad(nurbs_ref,  uI_ref,  xi, yi, a);
+[vCurr, gxCurr, gyCurr] = iga_eval_block(nurbs_curr, uI_curr, xi, yi, a);
+[vRef, gxRef, gyRef] = iga_eval_block(nurbs_ref, uI_ref, xi, yi, a);
 
-de  = vI_curr - vI_ref;
-dex = gxI_curr - gxI_ref;
-dey = gyI_curr - gyI_ref;
-H1_in = sum(abs(de).^2 + abs(dex).^2 + abs(dey).^2) * wA_in;
+dv = vCurr - vRef;
+dx = gxCurr - gxRef;
+dy = gyCurr - gyRef;
+L2sq = sum(abs(dv).^2, 1) * wA_in;
+DGsq = sum(abs(dv).^2 + abs(dx).^2 + abs(dy).^2, 1) * wA_in;
 
 [xo, yo, wA_out] = grid_points_outer(L, a, dx_out);
-H1_out = 0;
-nPts = numel(xo);
-k = 1;
-while k <= nPts
-    k2 = min(nPts, k + chunkSize - 1);
-    X  = xo(k:k2);
-    Y  = yo(k:k2);
-
-    [vA_curr, gxA_curr, gyA_curr] = pw_eval_val_grad(uA_curr, k_curr, X, Y, L);
-    [vA_ref,  gxA_ref,  gyA_ref ] = pw_eval_val_grad(uA_ref,  k_ref,  X, Y, L);
-
-    de  = vA_curr - vA_ref;
-    dex = gxA_curr - gxA_ref;
-    dey = gyA_curr - gyA_ref;
-    H1_out = H1_out + sum(abs(de).^2 + abs(dex).^2 + abs(dey).^2);
-    k = k2 + 1;
+for k = 1:chunkSize:numel(xo)
+    idx = k:min(numel(xo), k + chunkSize - 1);
+    [vCurr, gxCurr, gyCurr] = pw_eval_block( ...
+        uA_curr, k_curr, xo(idx), yo(idx), L);
+    [vRef, gxRef, gyRef] = pw_eval_block( ...
+        uA_ref, k_ref, xo(idx), yo(idx), L);
+    dv = vCurr - vRef;
+    dx = gxCurr - gxRef;
+    dy = gyCurr - gyRef;
+    L2sq = L2sq + sum(abs(dv).^2, 1) * wA_out;
+    DGsq = DGsq + sum(abs(dv).^2 + abs(dx).^2 + abs(dy).^2, 1) * wA_out;
 end
-H1_out = H1_out * wA_out;
 
 [xg, yg, wL] = boundary_points_square(a, dx_in);
-vA_curr = pw_eval_val(uA_curr, k_curr, xg, yg, L);
-vA_ref  = pw_eval_val(uA_ref,  k_ref,  xg, yg, L);
-vI_curr = iga_eval_val(nurbs_curr, uI_curr, xg, yg, a);
-vI_ref  = iga_eval_val(nurbs_ref,  uI_ref,  xg, yg, a);
+vACurr = pw_eval_block(uA_curr, k_curr, xg, yg, L);
+vARef = pw_eval_block(uA_ref, k_ref, xg, yg, L);
+vICurr = iga_eval_block(nurbs_curr, uI_curr, xg, yg, a);
+vIRef = iga_eval_block(nurbs_ref, uI_ref, xg, yg, a);
+jump = (vACurr - vARef) - (vICurr - vIRef);
+DGsq = DGsq + sigma * sum(abs(jump).^2, 1) * wL;
 
-jump = (vA_curr - vA_ref) - (vI_curr - vI_ref);
-J2 = sum(abs(jump).^2) * wL;
-
-errDG = sqrt(H1_in + H1_out + sigma * J2);
+errL2 = sqrt(max(real(L2sq), 0));
+errDG = sqrt(max(real(DGsq), 0));
 end
 
-function val = pw_eval_val(coeff, p_vec, X, Y, L)
-%Evaluate the field value.
+function [val, gx, gy] = pw_eval_block(coeff, p_vec, X, Y, L)
+% Evaluate one or more plane-wave fields and their gradients.
 F = [X(:)'; Y(:)'];
 expo = exp((1i * 2*pi / L) * (p_vec * F));
-val = (coeff.' * expo) / L;
-val = val(:);
-end
-
-function [val, gx, gy] = pw_eval_val_grad(coeff, p_vec, X, Y, L)
-%Evaluate the field value and gradient.
-F = [X(:)'; Y(:)'];
-expo = exp((1i * 2*pi / L) * (p_vec * F));
-
-val = (coeff.' * expo) / L;
 fac = (1i * 2*pi / L) / L;
-gx  = ((coeff .* p_vec(:,1)).' * expo) * fac;
-gy  = ((coeff .* p_vec(:,2)).' * expo) * fac;
-
-val = val(:);
-gx  = gx(:);
-gy  = gy(:);
+val = ((coeff.' * expo) / L).';
+gx = (((coeff .* p_vec(:,1)).' * expo) * fac).';
+gy = (((coeff .* p_vec(:,2)).' * expo) * fac).';
 end
 
-function val = iga_eval_val(nurbs, coeff, X, Y, a)
-%Evaluate the field value.
-[val, ~, ~] = iga_eval_val_grad(nurbs, coeff, X, Y, a);
+function [val, gx, gy] = iga_eval_block(nurbs, coeff, X, Y, a)
+% Evaluate one or more IGA fields and their gradients.
+nFields = size(coeff, 2);
+val = zeros(numel(X), nFields);
+gx = zeros(numel(X), nFields);
+gy = zeros(numel(X), nFields);
+for j = 1:nFields
+    [val(:,j), gx(:,j), gy(:,j)] = iga_eval_val_grad( ...
+        nurbs, coeff(:,j), X, Y, a);
+end
+end
+
+function A = hermitian(A)
+% Remove quadrature-level loss of Hermitian symmetry.
+A = (A + A') / 2;
 end
 
 function [val, gx, gy] = iga_eval_val_grad(nurbs, coeff, X, Y, a)
-%Evaluate the field value and gradient.
+% Evaluate the field value and gradient.
 pu = nurbs.pu;
 pv = nurbs.pv;
 U  = nurbs.Ubar(:).';
@@ -478,7 +513,7 @@ end
 end
 
 function [N, dN] = bspline_basis_and_der1_local(U, p, u, span)
-%Evaluate basis values and first derivatives.
+% Evaluate basis values and first derivatives.
 ndu = zeros(p+1, p+1);
 left = zeros(1, p+1);
 right = zeros(1, p+1);
@@ -515,7 +550,7 @@ dN = ders1 * p;
 end
 
 function span = findspan_local_local(n, p, u, U)
-%Locate an index or object used by the computation.
+% Find the active knot span for a parameter value.
 if u >= U(n+2)
     span = n + 1;
     return;
@@ -542,7 +577,7 @@ span = mid;
 end
 
 function [X, Y, wA] = grid_points_square(xmin, xmax, dx)
-%Build midpoint quadrature points in the square.
+% Build midpoint quadrature points in the square.
 x = xmin + dx/2 : dx : xmax - dx/2;
 [Xg, Yg] = meshgrid(x, x);
 X = Xg(:);
@@ -551,7 +586,7 @@ wA = dx * dx;
 end
 
 function [X, Y, wA] = grid_points_outer(L, a, dx)
-%Build midpoint quadrature points outside the square.
+% Build midpoint quadrature points outside the square.
 x = -L/2 + dx/2 : dx : L/2 - dx/2;
 [Xg, Yg] = meshgrid(x, x);
 mask = ~(Xg >= -a & Xg <= a & Yg >= -a & Yg <= a);
@@ -561,7 +596,7 @@ wA = dx * dx;
 end
 
 function [X, Y, wL] = boundary_points_square(a, ds)
-%Build midpoint quadrature points on the square boundary.
+% Build midpoint quadrature points on the square boundary.
 t = -a + ds/2 : ds : a - ds/2;
 
 xb = t;  yb = -a*ones(size(t));
@@ -575,25 +610,8 @@ wL = ds;
 end
 
 function h = estimate_h_parametric(nurbs_refine)
-%Estimate the parametric mesh size.
+% Estimate the parametric mesh size.
 Uu = unique(nurbs_refine.Ubar(:).');
 Vv = unique(nurbs_refine.Vbar(:).');
 h = max(max(diff(Uu)), max(diff(Vv)));
-end
-
-function [p_vec, n_pw_basis] = generate_p_vec(Nc)
-%Generate p vec.
-N = floor(Nc);
-p_vec = zeros((2*N+1)^2, 2);
-n_pw_basis = 0;
-
-for ii = -N:N
-    m = floor(sqrt(N^2 - ii^2));
-    for jj = -m:m
-        n_pw_basis = n_pw_basis + 1;
-        p_vec(n_pw_basis,:) = [ii, jj];
-    end
-end
-
-p_vec = p_vec(1:n_pw_basis, :);
 end

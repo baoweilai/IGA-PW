@@ -1,5 +1,5 @@
 ﻿function cfg = config_example_3()
-%Return fixed Example 3 parameters.
+% Return fixed Example 3 parameters.
 
 cfg.example = 3;
 cfg.name = 'Example 3';
@@ -17,5 +17,6 @@ cfg.dataScripts = {
     'model/h_convergence/run_reference.m'
     'model/cutoff_convergence/run_cutoff_data.m'
     'model/cutoff_convergence/run_reference.m'
+    'model/method_comparison/run_method_data.m'
     };
 end

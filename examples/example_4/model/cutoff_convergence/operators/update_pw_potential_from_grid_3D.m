@@ -1,6 +1,6 @@
 function pwDataNew = update_pw_potential_from_grid_3D( ...
 Vgrid, L, inner_domains, pwDataStatic, opts)
-%Update the PW potential operator from a grid potential.
+% Update the PW potential operator from a grid potential.
 arguments
 Vgrid
 L
@@ -60,7 +60,7 @@ end
 end
 
 function Vsample = sample_grid_values(Vgrid, L, X, Y, Z)
-%Sample grid values.
+% Interpolate periodic grid values at Cartesian sample points.
 mFFT = size(Vgrid, 1);
 dx = L / mFFT;
 x1d = -L / 2 + dx / 2 + (0:mFFT-1) * dx;
@@ -68,7 +68,7 @@ Vsample = interpn(x1d, x1d, x1d, Vgrid, X, Y, Z, 'linear');
 end
 
 function A = embed_center(X, convN)
-%Embed a smaller array at the grid center.
+% Embed a smaller array at the grid center.
 A = zeros(convN, convN, convN);
 K = size(X, 1);
 i0 = floor((convN - K) / 2) + 1;
@@ -76,6 +76,6 @@ A(i0:i0+K-1, i0:i0+K-1, i0:i0+K-1) = X;
 end
 
 function Ksym = hermitize_kernel_3d(K)
-%Compute kernel 3D.
+% Enforce Hermitian symmetry on a centered 3-D kernel.
 Ksym = 0.5 * (K + conj(K(end:-1:1, end:-1:1, end:-1:1)));
 end

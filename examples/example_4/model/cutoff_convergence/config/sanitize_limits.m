@@ -1,5 +1,5 @@
 ﻿function lim = sanitize_limits(lim)
-%Validate plotting limits.
+% Validate plotting limits.
 lim = real(lim(:)).';
 lim = lim(isfinite(lim));
 if numel(lim) < 2

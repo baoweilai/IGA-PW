@@ -1,8 +1,9 @@
 ﻿function [lambda1_final, u1_final, info] = solve_scf_groundstate( ...
 Mat0, M, n_dofs_nurbs, pw_dofs_indices, ...
-    nurbs_original, nurbs_refine, k_pw, L, a, Nc, n_gp, ...
+    nurbs_original, nurbs_refine, k_pw, L, a, ~, n_gp, ...
     targetShift, ops, primme_method, idxI, idxA, opts)
 
+% Solve the self-consistent IGA-PW ground state.
 scf_maxit      = opts.scf_maxit;
 scf_tol_lambda = opts.scf_tol_lambda;
 scf_mixing     = opts.scf_mixing;
@@ -26,6 +27,7 @@ info.time_build_prec_total    = 0;
 
 lambda_hist = zeros(scf_maxit, 1);
 
+% Solve the initial linearized ground-state problem.
 n_track_init = min(track_n_eigs, size(Mat0,1) - 1);
 if n_track_init < 1
     n_track_init = 1;
@@ -41,6 +43,7 @@ lambda_old = real(D0(1,1));
 info.time_eigs_total       = info.time_eigs_total + solveInfo0.time_eigs;
 info.time_build_prec_total = info.time_build_prec_total + solveInfo0.time_build_prec;
 
+% Update the nonlinear operator, eigenpair, and mixed state.
 for it = 1:scf_maxit
     [Nmat, ~] = build_nonlinear_operator( ...
         u_old, n_dofs_nurbs, pw_dofs_indices, ...
@@ -85,6 +88,9 @@ for it = 1:scf_maxit
     info.abslambda      = abslambda;
     info.last_branch_id = branch_id;
 
+    fprintf('[SCF-GS] lambda1 = %.12f, iters = %d, abslambda = %.3e\n', ...
+        lambda_new, it, abslambda);
+
     if it >= 3
         if abs(lambda_hist(it) - lambda_hist(it-2)) < 5e-5 && ...
                 abs(lambda_hist(it) - lambda_hist(it-1)) > 2e-4
@@ -101,6 +107,7 @@ for it = 1:scf_maxit
     end
 end
 
+% Assemble the nonlinear operator and solve the final eigenpair.
 [Nmat_final, ~] = build_nonlinear_operator( ...
     u_old, n_dofs_nurbs, pw_dofs_indices, ...
     nurbs_original, nurbs_refine, n_gp, ...
@@ -131,7 +138,7 @@ info.last_branch_id = branch_id_final;
 end
 
 function [u_sel, lambda_sel, idx_sel] = select_branch_by_overlap(Ucand, Dcand, u_prev, M)
-%Select the eigenvector branch by overlap.
+% Select the eigenvector branch by overlap.
 lams = real(diag(Dcand));
 nCand = size(Ucand, 2);
 overlaps = zeros(nCand, 1);
@@ -146,6 +153,7 @@ end
 function [uh, D, rnorms, stats, solveInfo, Pfun] = solve_generalized_eigs_with_blockdiag_jacobi( ...
 Mat, M, n_eigs, targetShift, ops, primme_method, idxI, idxA, n_dofs_nurbs, k_pw)
 
+% Solve the generalized eigenproblem with a block-diagonal Jacobi preconditioner.
 solveInfo = struct();
 
 Ktau = Mat - targetShift * M;
@@ -172,7 +180,7 @@ Pfun = @(X) apply_block_diag_jacobi_prec(X, dI, dA);
 end
 
 function [Pfun, dI, dA] = build_block_diag_jacobi_prec(K, idxI, idxA)
-%Build the block-diagonal Jacobi preconditioner.
+% Build the block-diagonal Jacobi preconditioner.
 dI = full(diag(K(idxI, idxI)));
 dA = full(diag(K(idxA, idxA)));
 
@@ -186,7 +194,7 @@ Pfun = @(X) apply_block_diag_jacobi_prec(X, dI, dA);
 end
 
 function Z = apply_block_diag_jacobi_prec(X, dI, dA)
-%Apply the block-diagonal Jacobi preconditioner.
+% Apply the block-diagonal Jacobi preconditioner.
 nI = numel(dI);
 X1 = X(1:nI, :);
 X2 = X(nI+1:end, :);
@@ -198,18 +206,18 @@ Z = [Z1; Z2];
 end
 
 function [uh, D, rnorms, stats] = call_primme_local(Mat, M, n_eigs, targetShift, ops, primme_method, Pfun)
-%Call PRIMME for the local eigenproblem.
+% Call PRIMME for the local eigenproblem.
 [uh, D, rnorms, stats] = primme_eigs(Mat, M, n_eigs, targetShift, ops, primme_method, Pfun);
 end
 
 function u = normalize_in_M(u, M)
-%Normalize an eigenvector in the mass inner product.
+% Normalize an eigenvector in the mass inner product.
 nu = real(u' * M * u);
 u = u / sqrt(abs(nu));
 end
 
 function u = fix_global_phase_single_pw(u, n_dofs_nurbs, k_pw)
-%Fix the global phase using one plane-wave coefficient.
+% Fix the global phase using one plane-wave coefficient.
 u_pw = u(n_dofs_nurbs+1:end);
 [~, idx] = max(abs(u_pw));
 k0 = k_pw(idx, :);
@@ -233,7 +241,7 @@ end
 end
 
 function u_new = align_phase_to_previous(u_new, u_old, M)
-%Align the eigenvector phase to the previous iterate.
+% Align the eigenvector phase to the previous iterate.
 alpha = u_old' * M * u_new;
 if abs(alpha) > 0
     u_new = exp(-1i * angle(alpha)) * u_new;

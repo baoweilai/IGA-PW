@@ -1,5 +1,5 @@
 function  b=Bin(n,i)
-%Compute a binomial coefficient.
+% Compute a binomial coefficient.
 numerator=1;
 denominator=1;
 

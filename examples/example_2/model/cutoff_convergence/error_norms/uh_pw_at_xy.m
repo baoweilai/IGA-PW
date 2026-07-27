@@ -1,5 +1,5 @@
 function uh_pw_xy = uh_pw_at_xy(uh_pw,p,x,y,L)
-%Evaluate the plane-wave solution at 2-D points.
+% Evaluate the plane-wave solution at 2-D points.
 
 n_pw_basis = size(p,1);
 F = [x;y];

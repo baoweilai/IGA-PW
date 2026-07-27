@@ -1,76 +1,96 @@
-function [A,M] = generate_A_M_NURBS_2D(nurbs_original,nurbs_refine,p_Vr,n_pw_Vr, L,n_gp, Example)
-%Assemble 2-D NURBS matrices.
+function [A, M] = generate_A_M_NURBS_2D(g, k, L, nq, a)
+% Assemble the Example 1 NURBS volume matrices on the affine square.
 
-ConPts_o     = nurbs_original.ConPts ;
-weights_o    = nurbs_original.weights;
-knotU_o      = nurbs_original.knotU;
-knotV_o      = nurbs_original.knotV;
-pu_o         =  nurbs_original.pu;
-pv_o         =  nurbs_original.pv;
-Element=nurbs_refine.Element;
-knotU=nurbs_refine.Ubar;
-knotV=nurbs_refine.Vbar;
-Coordinate = nurbs_refine.Coordinate;
-Fhat = @(x,a,b) ( (b-a)*x+a+b )/2;
-NoEs=nurbs_refine.NoEs;
-n_dofs=nurbs_refine.n_dofs;
+[gp, gw] = grule(nq);
+u = basis_data(g.UBreaks, g.Ubar, g.pu, gp, gw, a);
+v = basis_data(g.VBreaks, g.Vbar, g.pv, gp, gw, a);
 
-pu = nurbs_refine.pu;
-pv = nurbs_refine.pv;
-[gp,gw] = grule(n_gp);
-n_ele_dofs = (pu+1)*(pv+1);
+nd = (g.pu + 1) * (g.pv + 1);
+ne = g.NoEs;
+nz = ne * nd^2;
+ii = zeros(nz, 1);
+jj = zeros(nz, 1);
+av = zeros(nz, 1);
+mv = zeros(nz, 1);
+pos = 1;
 
-Ae =zeros(n_ele_dofs,n_ele_dofs); % Element stiffness matrix
-Me =zeros(n_ele_dofs,n_ele_dofs); % Element mass matrix
+for jv = 1:g.vNoEs
+    for iu = 1:g.uNoEs
+        e = iu + (jv - 1) * g.uNoEs;
+        [B, Bx, By, w, x, y] = element_data(u{iu}, v{jv}, a);
+        V = potential(k, L, x, y);
 
-A_value = zeros(NoEs*n_ele_dofs*n_ele_dofs,1);
-M_value = zeros(NoEs*n_ele_dofs*n_ele_dofs,1);
-row_index = A_value;
-column_index = A_value;
-global_index = 1;
+        Bw = B .* w.';
+        Mloc = Bw * B';
+        Kloc = 0.5 * ((Bx .* w.') * Bx' + (By .* w.') * By');
+        Aloc = Kloc + (B .* (w .* V).') * B';
 
-for e = 1:NoEs
-    Ae = 0*Ae;  Me = 0*Me; % Fe =0*Fe;     Me_ext = 0*Me_ext;
-    ue = Coordinate(e,1:2);   J1 = (ue(2) - ue(1) )/2;
-    ve = Coordinate(e,3:4);   J2 = (ve(2) - ve(1) )/2;
-    row = Element(e,:);
-    for i=1:n_gp
-        u       = Fhat(gp(i),ue(1),ue(2));
-        uders   = bspbasisDers(knotU,pu,u,1);
-        Nu  = uders(1,:)';
-        DNu = uders(2,:)';
-        for j=1:n_gp
-            v       = Fhat(gp(j),ve(1),ve(2));
-            vders   = bspbasisDers(knotV,pv,v,1);
-            Nv  = vders(1,:);
-            DNv = vders(2,:);
-            [F,DF] = NurbsSurface(ConPts_o,weights_o,knotU_o,pu_o,u,knotV_o,pv_o,v);
-            basis_funcs = Nu*Nv;  basis_funcs = basis_funcs(:);
-            DNu_v = DNu*Nv; DNu_v = DNu_v(:);
-            DNv_u = Nu*DNv; DNv_u = DNv_u(:);
-            basis_grad = [DNu_v,DNv_u]/DF;
-            Jacobian = J1*J2*abs(det(DF))*gw(i)*gw(j);
-            Mass_mat_ele = basis_funcs*basis_funcs'*Jacobian;
-            if strcmp( Example, 'Example_1')
-                V_ext = Vr_2D_Example_1(p_Vr,L,n_pw_Vr,F(1),F(2));
-            else
-                V_ext = Vr_2D_Example_2(p_Vr,L,n_pw_Vr,F(1),F(2));
-            end
-            Ae = Ae + basis_grad*basis_grad'*Jacobian/2 + V_ext*Mass_mat_ele;
-            Me = Me + Mass_mat_ele;
-        end
-    end
-
-    for i1=1:n_ele_dofs
-        for j1=1:n_ele_dofs
-            row_index(global_index) = row(i1);
-            column_index(global_index) = row(j1);
-            A_value(global_index) =   Ae(i1,j1);
-            M_value(global_index) =   Me(i1,j1);
-            global_index = global_index + 1;
-        end
+        id = pos:(pos + nd^2 - 1);
+        dofs = g.Element(e, :).';
+        ii(id) = repmat(dofs, nd, 1);
+        jj(id) = repelem(dofs, nd, 1);
+        av(id) = Aloc(:);
+        mv(id) = Mloc(:);
+        pos = pos + nd^2;
     end
 end
-A =sparse(row_index,column_index,A_value,n_dofs,n_dofs);
-M =sparse(row_index,column_index,M_value,n_dofs,n_dofs);
+
+A = sparse(ii, jj, av, g.n_dofs, g.n_dofs);
+M = sparse(ii, jj, mv, g.n_dofs, g.n_dofs);
+end
+
+function data = basis_data(breaks, knot, p, gp, gw, a)
+% Precompute one-dimensional basis values and physical derivatives.
+
+data = cell(numel(breaks) - 1, 1);
+for e = 1:numel(data)
+    ab = breaks(e:e+1);
+    q = ((ab(2) - ab(1)) * gp + ab(1) + ab(2)) / 2;
+    N = zeros(p + 1, numel(gp));
+    D = N;
+    for j = 1:numel(gp)
+        ders = bspbasisDers(knot, p, q(j), 1);
+        N(:, j) = ders(1, :).';
+        D(:, j) = ders(2, :).' / (2 * a);
+    end
+    data{e} = struct('N', N, 'D', D, ...
+        'w', (ab(2) - ab(1)) * gw(:) / 2, ...
+        'x', -a + 2 * a * q(:));
+end
+end
+
+function [B, Bx, By, w, x, y] = element_data(u, v, a)
+% Build tensor-product basis operators for one element.
+
+nu = numel(u.x);
+nv = numel(v.x);
+nd = size(u.N, 1) * size(v.N, 1);
+B = zeros(nd, nu * nv);
+Bx = B;
+By = B;
+
+for j = 1:nv
+    id = (j - 1) * nu + (1:nu);
+    B(:, id) = kron(v.N(:, j), u.N);
+    Bx(:, id) = kron(v.N(:, j), u.D);
+    By(:, id) = kron(v.D(:, j), u.N);
+end
+
+w = 4 * a^2 * kron(v.w, u.w);
+x = repmat(u.x, nv, 1);
+y = kron(v.x, ones(nu, 1));
+end
+
+function V = potential(k, L, x, y)
+% Evaluate the Example 1 radial potential in one batch.
+
+mu = 5;
+G = (2 * pi / L) * k;
+gn = hypot(G(:, 1), G(:, 2));
+id = gn > 0;
+c = erfc(gn(id) / (2 * mu)) ./ gn(id);
+r = hypot(x, y);
+V = -erfc(mu * r) ./ r ...
+    - (2 * pi / L^2) * (exp(1i * ([x, y] * G(id, :).')) * c) ...
+    + 2 * mu / sqrt(pi);
 end

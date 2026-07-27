@@ -1,5 +1,5 @@
 function nurbsInfo = IGA_2D_Grid_nElem(~, ~, pu, pv, nElem)
-%Build a 2-D IGA grid with fixed element counts.
+% Build a 2-D IGA grid with fixed element counts.
 
 Ubar = build_open_uniform_knot(pu, nElem);
 Vbar = build_open_uniform_knot(pv, nElem);
@@ -308,7 +308,7 @@ nurbsInfo.right_dofs_2nd_layer  = (0:(n-1))*m + m - 1;
 end
 
 function U = build_open_uniform_knot(p, nElem)
-%Build open uniform knot.
+% Build an open uniform knot vector for the requested mesh.
 if nElem < 1 || abs(nElem - round(nElem)) > 0
     error('nElem must be a positive integer.');
 end

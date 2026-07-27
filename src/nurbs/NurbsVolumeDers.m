@@ -1,6 +1,7 @@
 function [W,DW, D2W,F,DF,D2F]=NurbsVolumeDers(ConPts,knotU,knotV,knotW,weights,pu,u,pv,v,pw,w)
-%Evaluate NURBS volume derivatives.
+% Evaluate NURBS volume derivatives.
 
+% Evaluate the one-dimensional basis derivatives.
 Uders=bspbasisDers(knotU,pu,u,2);
 Nu=    Uders(1,:);
 DNu=  Uders(2,:);
@@ -17,6 +18,7 @@ DNw=  Wders(2,:)';
 D2Nw=Wders(3,:)';
 
 
+% Select the active tensor-product control points.
 i=findspan(knotU,pu,u);
 j=findspan(knotV,pv,v);
 k=findspan(knotW,pw,w);
@@ -36,6 +38,7 @@ P_w=ConPts(u_index,v_index,w_index,3);
 DIM=3;
 
 
+% Accumulate the rational denominator and weighted geometry.
 F=zeros(DIM,1);
 
 
@@ -68,6 +71,7 @@ for i1=1:(pu+1)
     end
 end
 
+% Convert the weighted point to physical coordinates.
 F=F/W;
 
 
@@ -78,6 +82,7 @@ W2 = W*W;
 W3 = W*W2;
 
 
+% Form the first- and second-order rational basis derivatives.
 DF=zeros(DIM,DIM);
 
 R_DNu =  (DNu*W-Nu*DW(1))/W2;    % The derivative of N_{i,pu}(u)/W(u,v,w)
@@ -96,6 +101,7 @@ R_D2Nuw=  ( (DNu*DW(3) - Nu*D2W(1,3) )*W- (DNu*W - Nu*DW(1))*2*DW(3) )/W3;
 R_D2Nvw=  ( (DNv*DW(3) - Nv*D2W(2,3) )*W- (DNv*W - Nv*DW(2))*2*DW(3) )/W3;
 
 
+% Accumulate the geometry Jacobian and Hessian.
 for i1=1:(pu+1)
     for j1=1:(pv+1)
         for k1=1:(pw+1)
@@ -145,6 +151,7 @@ for i1=1:(pu+1)
 end
 
 
+% Fill the symmetric mixed-derivative entries.
 D2F(1,1,2) = D2F(1,2,1);
 D2F(2,1,2) = D2F(2,2,1);
 D2F(3,1,2) = D2F(3,2,1);

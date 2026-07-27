@@ -1,5 +1,5 @@
 function [Ubar,Vbar,dof]=IGAknotRefineSurface(knotU,knotV,pu,pv,Refinement)
-%Refine NURBS surface knot vectors.
+% Refine NURBS surface knot vectors.
 Ubar = knotU;
 Vbar = knotV;
 for i=1:Refinement

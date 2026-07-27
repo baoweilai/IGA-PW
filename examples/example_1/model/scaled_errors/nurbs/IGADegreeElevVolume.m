@@ -1,5 +1,5 @@
 function [knotUbar,knotVbar,knotWbar]=IGADegreeElevVolume(knotU,knotV,knotW,t)
-%Elevate a NURBS volume degree.
+% Elevate a NURBS volume degree.
 
 % Elevate the degree of B-spline basis functions to (pi +t) for i=1,2 and
 

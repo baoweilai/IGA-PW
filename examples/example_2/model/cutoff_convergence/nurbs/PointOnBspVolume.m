@@ -1,5 +1,5 @@
 function S=PointOnBspVolume(P,U,pu,u,V,pv,v,knotW,pw,w)
-%Evaluate a point on a B-spline volume.
+% Evaluate a point on a B-spline volume.
 
 ndim=size(P,4);
 

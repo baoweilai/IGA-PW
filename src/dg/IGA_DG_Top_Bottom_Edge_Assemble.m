@@ -1,10 +1,7 @@
 function [P,S] =  IGA_DG_Top_Bottom_Edge_Assemble(nurbs_original_1,nurbs_original_2,nurbs_refine_1,nurbs_refine_2,n_dofs)
-%Assemble matrices or interface terms for the method.
+% Couple the top of patch 1 to the bottom of patch 2.
 
-% Now the two sub-domains are the upper one (v=0)  and lower one (v=1), the
-% interface is at v = 0 for upper one, and v = 1 for the upper one
-
-
+% Read both patch geometries and refined spaces.
 ConPts_o_1   =  nurbs_original_1.ConPts;
 weights_o_1  =  nurbs_original_1.weights;
 knotU_o_1    =  nurbs_original_1.knotU;
@@ -32,6 +29,7 @@ pv_2    = nurbs_refine_2.pv;
 S = sparse(n_dofs,n_dofs);
 P = S;
 % The plus sign points from the lower domain to upper element
+% Merge the interface partition and edge-element maps.
 UBreaks_1 = nurbs_refine_1.UBreaks;
 UBreaks_2 = nurbs_refine_2.UBreaks;
 
@@ -55,7 +53,7 @@ edge_element_2 =  Merge_edge_elements_idx(UBreaks_2,UBreaks_merge);
 
 n_gp = length(gp);
 
-% As the interface is v = 1, so we consider v = 1
+% Fix the interface parameters at v = 1 and v = 0.
 v_top_1 = 1;
 v_bottom_2 = 0;
 
@@ -79,7 +77,7 @@ for e=1:uNoEs
 
     for i=1:n_gp
     u  = ((b-a)*gp(i) +a+b)/2;
-    [F,DF_plus]   =  NurbsSurface(ConPts_o_1 ,weights_o_1,knotU_o_1 ,pu_o_1,u,knotV_o_1,pv_o_1,v_top_1);% Left patch
+    [~,DF_plus]   =  NurbsSurface(ConPts_o_1 ,weights_o_1,knotU_o_1 ,pu_o_1,u,knotV_o_1,pv_o_1,v_top_1);% Left patch
 
     tau    = DF_plus(:,1);
     ds     = norm(tau);

@@ -1,8 +1,5 @@
 function [P,S] =  IGA_DG_Right_Edge_Assemble(nurbs_original, nurbs_refine, pw_index,plane_wave_dofs_index, L,  n_dofs)
-%Assemble matrices or interface terms for the method.
-
-% Now the two sub-domains are the upper one (v=0)  and lower one (v=1), the
-% interface is at v = 0 for upper one, and v = 1 for the upper one
+% Couple the inner right boundary to the outer plane-wave region.
 
 DIM = 2;
 
@@ -45,12 +42,12 @@ end
 n_gp = length(gp);
 
 
-% As the interface is the left boundary of inner domain, so we consider u = 0
+% Fix the boundary parameter at u = 1.
 
 u_right_inner    = 1;  % The right boundary edge of inner domain, u = 1
 
-%% For plane wave functions
-edge_dofs_minus  =  plane_wave_dofs_index; % To be done
+% Initialize plane-wave traces.
+edge_dofs_minus  =  plane_wave_dofs_index;
 n_pw_basis       =  size(pw_index,1);
 basis_grad_minus =  zeros(n_pw_basis,DIM);
 basis_minus      =  zeros(n_pw_basis,1);

@@ -1,5 +1,5 @@
 ﻿function out = plot_cutoff_dg()
-%Plot cutoff DG.
+% Plot cutoff DG.
 
 clc; close all; format short e;
 
@@ -26,10 +26,6 @@ beta       = 20;
 dx_in      = 5e-3;
 dx_out     = 5e-3;
 chunkSize  = 20000;
-
-save_png   = true;
-save_pdf   = true;
-pngDPI     = 600;
 
 %% ---------------- plotting params ----------------
 cfg = struct();
@@ -145,7 +141,6 @@ end
 baseName = 'cutoff_dg';
 errCsv   = fullfile(plotDir, [baseName, '.csv']);
 errMat   = fullfile(plotDir, [baseName, '.mat']);
-pngFile  = fullfile(plotDir, [baseName, '.png']);
 pdfFile  = fullfile(plotDir, [baseName, '.pdf']);
 
 if exist(errCsv, 'file')
@@ -312,25 +307,18 @@ lgd.FontSize = cfg.legend.fontSize;
 
 apply_semilogy_padding(ax, xPad, yPad);
 
-if save_png
-    exportgraphics(fig, pngFile, 'Resolution', pngDPI);
-    fprintf('[SAVE] %s\n', pngFile);
-end
-
-if save_pdf
-    exportgraphics(fig, pdfFile, 'ContentType', 'vector');
-    fprintf('[SAVE] %s\n', pdfFile);
-end
+exportgraphics(fig, pdfFile, 'ContentType', 'vector');
+fprintf('[SAVE] %s\n', pdfFile);
 
 out = struct('Example', Example, 'refine', refine, 'pdeg', pdeg, ...
     'Nc', Nc_common, 'lambda_ref', lambda_ref, ...
     'errLambda', errLambda_plot, 'errDG', errDG_plot, ...
-    'csv', errCsv, 'mat', errMat, 'png', pngFile, 'pdf', pdfFile);
+    'csv', errCsv, 'mat', errMat, 'pdf', pdfFile);
 
 end
 
 function style_two_lines(hLines, cfg)
-%Apply two lines.
+% Apply the shared style to both plotted curves.
 marks = {'o', 's'};
 cols = cfg.lineColors(1:2, :);
 
@@ -346,7 +334,7 @@ end
 end
 
 function apply_semilogy_padding(ax, xPad, yPad)
-%Apply semilogy padding.
+% Apply semilogy padding.
 x = ax.XLim;
 dx = x(2) - x(1);
 if dx <= 0
@@ -369,7 +357,7 @@ ax.YLim = [min(yAll) / yPad, max(yAll) * yPad];
 end
 
 function rr = load_run_data(runMat)
-%Load run data.
+% Load one saved DG-PW run.
 S = load(runMat);
 assert(isfield(S, 'run'), 'Run file must contain a run struct: %s', runMat);
 R = S.run;
@@ -383,7 +371,7 @@ rr.h = R.meta.h;
 end
 
 function Nc_list = scan_existing_Nc(caseDir)
-%Compute existing nc.
+% Read the available cutoff values from completed case folders.
 dd = dir(fullfile(caseDir, 'Nc_*'));
 Nc_list = [];
 
@@ -409,6 +397,7 @@ nurbs_curr, uI_curr, uA_curr, k_curr, ...
     nurbs_ref,  uI_ref,  uA_ref,  k_ref, ...
     L, a, dx_in, dx_out, chunkSize, sigma)
 
+% Compute the DG eigenfunction error.
 [xi, yi, wA_in] = grid_points_square(-a, a, dx_in);
 [vI_curr, gxI_curr, gyI_curr] = iga_eval_val_grad(nurbs_curr, uI_curr, xi, yi, a);
 [vI_ref,  gxI_ref,  gyI_ref ] = iga_eval_val_grad(nurbs_ref,  uI_ref,  xi, yi, a);
@@ -454,7 +443,7 @@ errDG = sqrt(H1_in + H1_out + sigma * J2);
 end
 
 function val = pw_eval_val(coeff, p_vec, X, Y, L)
-%Evaluate the field value.
+% Evaluate the field value.
 F = [X(:)'; Y(:)'];
 expo = exp((1i * 2*pi / L) * (p_vec * F));
 val = (coeff.' * expo) / L;
@@ -462,7 +451,7 @@ val = val(:);
 end
 
 function [val, gx, gy] = pw_eval_val_grad(coeff, p_vec, X, Y, L)
-%Evaluate the field value and gradient.
+% Evaluate the field value and gradient.
 F = [X(:)'; Y(:)'];
 expo = exp((1i * 2*pi / L) * (p_vec * F));
 
@@ -477,12 +466,12 @@ gy  = gy(:);
 end
 
 function val = iga_eval_val(nurbs, coeff, X, Y, a)
-%Evaluate the field value.
+% Evaluate the field value.
 [val, ~, ~] = iga_eval_val_grad(nurbs, coeff, X, Y, a);
 end
 
 function [val, gx, gy] = iga_eval_val_grad(nurbs, coeff, X, Y, a)
-%Evaluate the field value and gradient.
+% Evaluate the field value and gradient.
 pu = nurbs.pu;
 pv = nurbs.pv;
 U  = nurbs.Ubar(:).';
@@ -531,7 +520,7 @@ end
 end
 
 function [N, dN] = bspline_basis_and_der1(U, p, u, span)
-%Evaluate basis values and first derivatives.
+% Evaluate basis values and first derivatives.
 ndu = zeros(p+1, p+1);
 left = zeros(1, p+1);
 right = zeros(1, p+1);
@@ -569,7 +558,7 @@ dN = ders1 * p;
 end
 
 function span = findspan_local(n, p, u, U)
-%Locate an index or object used by the computation.
+% Find the active knot span for a parameter value.
 if u >= U(n+2)
     span = n + 1;
     return;
@@ -596,7 +585,7 @@ span = mid;
 end
 
 function [X, Y, wA] = grid_points_square(xmin, xmax, dx)
-%Build midpoint quadrature points in the square.
+% Build midpoint quadrature points in the square.
 x = xmin + dx/2 : dx : xmax - dx/2;
 [Xg, Yg] = meshgrid(x, x);
 X = Xg(:);
@@ -605,7 +594,7 @@ wA = dx * dx;
 end
 
 function [X, Y, wA] = grid_points_outer(L, a, dx)
-%Build midpoint quadrature points outside the square.
+% Build midpoint quadrature points outside the square.
 x = -L/2 + dx/2 : dx : L/2 - dx/2;
 [Xg, Yg] = meshgrid(x, x);
 mask = ~(Xg >= -a & Xg <= a & Yg >= -a & Yg <= a);
@@ -615,7 +604,7 @@ wA = dx * dx;
 end
 
 function [X, Y, wL] = boundary_points_square(a, ds)
-%Build midpoint quadrature points on the square boundary.
+% Build midpoint quadrature points on the square boundary.
 t = -a + ds/2 : ds : a - ds/2;
 
 xb = t;  yb = -a*ones(size(t));

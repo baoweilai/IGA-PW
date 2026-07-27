@@ -1,5 +1,5 @@
 ﻿function plot_dg_error()
-%Plot DG error.
+% Plot DG error.
 
 clc; close all;
 
@@ -12,20 +12,16 @@ set(groot, ...
 Example    = 'Example_3';
 Nc_fixed   = 20;
 p_list     = [1 2];
-nElem_list = [12 14 16 18 20];
+nElem_list = [4 8 16 32 64];
 
 % -------- reference --------
 ref_Nc     = 40;
 ref_p      = 2;
 ref_refine = 7;
 
-save_png  = true;
-save_pdf  = true;
-pngDPI    = 600;
-
 L         = 4;
 a         = 0.2;
-beta      = 20;
+beta      = 100;
 
 dx_in     = 5e-3;
 dx_out    = 5e-3;
@@ -64,14 +60,14 @@ cfg.axes.xlabel     = '$h$';
 cfg.axes.ylabel     = '$\|u_1-u_{1}^{\mathrm{DG}}\|_{\mathrm{DG}}$';
 cfg.axes.labelSize  = 12;
 
-cfg.range.padX = 0.1;
-cfg.range.padY = 0.4;
+cfg.range.padX = 0.2;
+cfg.range.padY = 0.6;
 
-cfg.axis.XTick      = [0.02 0.05];
-cfg.axis.XTickLabel = {'0.02','0.05'};
+cfg.axis.XTick      = [1e-2 1e-1];
+cfg.axis.XTickLabel = {'$10^{-2}$','$10^{-1}$'};
 cfg.axis.XLim       = [];
-cfg.axis.YTick      = [0.02 0.05];
-cfg.axis.YTickLabel = {'0.02','0.05'};
+cfg.axis.YTick      = [1e-2 1e-1];
+cfg.axis.YTickLabel = {'$10^{-2}$','$10^{-1}$'};
 cfg.axis.YLim       = [];
 
 cfg.slope.color1    = [033 158 188] / 255;
@@ -201,7 +197,7 @@ for ip = 1:numel(p_list)
     rows = sortrows(rows, 'h', 'descend');
 
     writetable(rows, csvFile);
-    T = rows; %#ok<NASGU>
+    T = rows;
     save(matFile, 'T');
 
     h_desc   = rows.h;
@@ -232,7 +228,6 @@ plotData = plotData(validMask);
 
 assert(~isempty(plotData), 'No valid plot data found.');
 
-pngFile = fullfile(outDir, 'dg_error.png');
 pdfFile = fullfile(outDir, 'dg_error.pdf');
 
 fig = figure('Color', cfg.fig.bgColor, ...
@@ -295,8 +290,8 @@ yref1 = (cfg.slope.factor1 * yMax) * (xGrid ./ h0).^cfg.slope.order1;
 hSlope = plot(ax, xGrid, yref1, cfg.slope.lineStyle, ...
     'Color', cfg.slope.color1, ...
     'LineWidth', cfg.slope.lineWidth);
-hList(end+1) = hSlope; %#ok<AGROW>
-leg{end+1} = '$\mathrm{Slope} = 1$'; %#ok<AGROW>
+hList(end+1) = hSlope;
+leg{end+1} = '$\mathrm{Slope} = 1$';
 
 xlabel(ax, cfg.axes.xlabel, 'FontSize', cfg.axes.labelSize, 'Interpreter', 'latex');
 ylabel(ax, cfg.axes.ylabel, 'FontSize', cfg.axes.labelSize, 'Interpreter', 'latex');
@@ -338,18 +333,12 @@ lgd = legend(ax, hList, leg, ...
     'FontSize', cfg.legend.fontSize);
 lgd.Box = cfg.legend.box;
 
-if save_png
-    exportgraphics(fig, pngFile, 'Resolution', pngDPI);
-    fprintf('[SAVE] %s\n', pngFile);
-end
-if save_pdf
-    exportgraphics(fig, pdfFile, 'ContentType', 'vector');
-    fprintf('[SAVE] %s\n', pdfFile);
-end
+exportgraphics(fig, pdfFile, 'ContentType', 'vector');
+fprintf('[SAVE] %s\n', pdfFile);
 end
 
 function rr = load_run_data(runMat)
-%Load run data.
+% Load one saved DG-PW run.
 S = load(runMat);
 assert(isfield(S, 'run'), 'Run file must contain a run struct: %s', runMat);
 R = S.run;
@@ -362,7 +351,7 @@ rr.h = R.meta.h;
 end
 
 function idx = choose_anchor_index(xGrid)
-%Choose the point used for slope annotation.
+% Choose the point used for slope annotation.
 n = numel(xGrid);
 if n <= 2
     idx = 1;
@@ -376,6 +365,7 @@ nurbs_curr, uI_curr, uA_curr, k_curr, ...
     nurbs_ref,  uI_ref,  uA_ref,  k_ref, ...
     L, a, dx_in, dx_out, chunkSize, sigma)
 
+% Compute the DG eigenfunction error.
 [xi, yi, wA_in] = grid_points_square(-a, a, dx_in);
 [vI_curr, gxI_curr, gyI_curr] = iga_eval_val_grad(nurbs_curr, uI_curr, xi, yi, a);
 [vI_ref,  gxI_ref,  gyI_ref ] = iga_eval_val_grad(nurbs_ref,  uI_ref,  xi, yi, a);
@@ -419,7 +409,7 @@ errDG = sqrt(H1_in + H1_out + sigma * J2);
 end
 
 function val = pw_eval_val(coeff, p_vec, X, Y, L)
-%Evaluate the field value.
+% Evaluate the field value.
 F = [X(:)'; Y(:)'];
 expo = exp((1i * 2*pi / L) * (p_vec * F));
 val = (coeff.' * expo) / L;
@@ -427,7 +417,7 @@ val = val(:);
 end
 
 function [val, gx, gy] = pw_eval_val_grad(coeff, p_vec, X, Y, L)
-%Evaluate the field value and gradient.
+% Evaluate the field value and gradient.
 F = [X(:)'; Y(:)'];
 expo = exp((1i * 2*pi / L) * (p_vec * F));
 
@@ -442,12 +432,12 @@ gy  = gy(:);
 end
 
 function val = iga_eval_val(nurbs, coeff, X, Y, a)
-%Evaluate the field value.
+% Evaluate the field value.
 [val, ~, ~] = iga_eval_val_grad(nurbs, coeff, X, Y, a);
 end
 
 function [val, gx, gy] = iga_eval_val_grad(nurbs, coeff, X, Y, a)
-%Evaluate the field value and gradient.
+% Evaluate the field value and gradient.
 pu = nurbs.pu;
 pv = nurbs.pv;
 U  = nurbs.Ubar(:).';
@@ -493,7 +483,7 @@ end
 end
 
 function [N, dN] = bspline_basis_and_der1(U, p, u, span)
-%Evaluate basis values and first derivatives.
+% Evaluate basis values and first derivatives.
 ndu = zeros(p+1, p+1);
 left = zeros(1, p+1);
 right = zeros(1, p+1);
@@ -530,7 +520,7 @@ dN = ders1 * p;
 end
 
 function span = findspan_local(n, p, u, U)
-%Locate an index or object used by the computation.
+% Find the active knot span for a parameter value.
 if u >= U(n+2)
     span = n + 1;
     return;
@@ -557,7 +547,7 @@ span = mid;
 end
 
 function [X, Y, wA] = grid_points_square(xmin, xmax, dx)
-%Build midpoint quadrature points in the square.
+% Build midpoint quadrature points in the square.
 x = xmin + dx/2 : dx : xmax - dx/2;
 [Xg, Yg] = meshgrid(x, x);
 X = Xg(:);
@@ -566,7 +556,7 @@ wA = dx * dx;
 end
 
 function [X, Y, wA] = grid_points_outer(L, a, dx)
-%Build midpoint quadrature points outside the square.
+% Build midpoint quadrature points outside the square.
 x = -L/2 + dx/2 : dx : L/2 - dx/2;
 [Xg, Yg] = meshgrid(x, x);
 mask = ~(Xg >= -a & Xg <= a & Yg >= -a & Yg <= a);
@@ -576,7 +566,7 @@ wA = dx * dx;
 end
 
 function [X, Y, wL] = boundary_points_square(a, ds)
-%Build midpoint quadrature points on the square boundary.
+% Build midpoint quadrature points on the square boundary.
 t = -a + ds/2 : ds : a - ds/2;
 
 xb = t;  yb = -a*ones(size(t));
