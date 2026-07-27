@@ -7,7 +7,6 @@ uspan=findspan(U,pu,u);    Nu=bsplinebasis(U,pu,u);
 vspan=findspan(V,pv,v);     Nv=bsplinebasis(V,pv,v);
 wspan=findspan(knotW,pw,w); Nw=bsplinebasis(knotW,pw,w);
 
-
 S=zeros(ndim,1);
 
 for dim=1:ndim

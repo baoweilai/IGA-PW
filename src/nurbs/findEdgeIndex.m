@@ -15,10 +15,8 @@ while knot<uBreaks(mid) || knot>uBreaks(mid+1)
 
    mid = fix((low+high)/2);
 
-
 end
 
 dg_ele_idx = mid;
-
 
 end

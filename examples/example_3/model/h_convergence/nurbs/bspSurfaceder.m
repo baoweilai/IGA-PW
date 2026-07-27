@@ -27,7 +27,6 @@ for i=1:ndim
     DSu(i)=Nu'*temp*Nv;
 end
 
-
 % Evaluate the derivative in the v direction.
 Vbar=V;
 Vbar([1,end])=[];

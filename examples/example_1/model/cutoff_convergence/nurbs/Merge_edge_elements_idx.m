@@ -14,5 +14,4 @@ for i = 1:n_merge_edges
     edge_element_idx(i) = dg_ele_idx;
 end
 
-
 end

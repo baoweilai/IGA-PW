@@ -29,5 +29,4 @@ end
 dg_2D_domains_idx.dg_2D_domains_idx_left2right = dg_2D_domains_idx_left2right;
 dg_2D_domains_idx.dg_2D_domains_idx_bottom2top = dg_2D_domains_idx_bottom2top;
 
-
 end

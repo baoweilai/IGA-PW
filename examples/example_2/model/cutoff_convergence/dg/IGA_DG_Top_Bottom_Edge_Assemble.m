@@ -45,7 +45,6 @@ for i=1:uNoEs
     bottom_edge_node_1(i,:) = [UBreaks_merge(i),UBreaks_merge(i+1)];
 end
 
-
 edge_element_1 =  Merge_edge_elements_idx(UBreaks_1,UBreaks_merge);
 edge_element_2 =  Merge_edge_elements_idx(UBreaks_2,UBreaks_merge);
 
@@ -83,7 +82,6 @@ for e=1:uNoEs
         ds     = norm(tau);
         normal = [-tau(2);tau(1)]/ds;
 
-
         Jacobi = J1*gw(i)*ds; % The interface is u = 1, now along the v-direction
 
         Uders_plus  = bspbasisDers(knotU_1,pu_1,u,1);
@@ -95,7 +93,6 @@ for e=1:uNoEs
         DNu_v_plus = DNu_plus*Nv_plus;   DNu_v_plus = DNu_v_plus(:);
         DNv_u_plus = Nu_plus*DNv_plus;   DNv_u_plus = DNv_u_plus(:);
         basis_grad_plus = [DNu_v_plus,DNv_u_plus]/DF_plus;
-
 
         Uders_minus  = bspbasisDers(knotU_2,pu_2,u,1); % For Omega 2, it is the left boundary, u = 0.
         Nu_minus     = Uders_minus(1,:)';     DNu_minus = Uders_minus(2,:)';
@@ -111,20 +108,16 @@ for e=1:uNoEs
         edge_jump    = [basis_plus; - basis_minus];
         edge_jump_Ae = edge_jump_Ae + edge_jump*edge_jump'*Jacobi;
 
-
         edge_average    = [basis_grad_plus; basis_grad_minus]*normal/2; % Now it is a column vector
         edge_average    = edge_average'; % Now it is a row vector
         edge_average_Ae = edge_average_Ae + edge_jump*edge_average*Jacobi;
 
-
     end
-
 
     P(edge_dofs,edge_dofs) =  P(edge_dofs,edge_dofs) + edge_jump_Ae;
 
     S(edge_dofs,edge_dofs) =  S(edge_dofs,edge_dofs) + edge_average_Ae;
 
 end
-
 
 end

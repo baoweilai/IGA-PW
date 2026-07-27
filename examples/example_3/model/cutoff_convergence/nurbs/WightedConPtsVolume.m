@@ -12,7 +12,6 @@ for i=1:nu
     end
 end
 
-
 for dim=1:ndim
 
     for i=1:nu
@@ -24,6 +23,5 @@ for dim=1:ndim
     end
 
 end
-
 
 end

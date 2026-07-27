@@ -442,7 +442,6 @@ end
 lambda = lambda(:).';
 end
 
-
 function s = string_or_empty_local(x)
 % Convert a value to text or return an empty string.
 if isempty(x)

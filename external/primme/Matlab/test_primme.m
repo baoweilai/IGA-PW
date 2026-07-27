@@ -26,7 +26,6 @@
 %  PRIMME: https://github.com/primme/primme
 %  Contact: Andreas Stathopoulos, a n d r e a s _at_ c s . w m . e d u
 
-
 % Compute the 6 largest eigenvalues of a matrix with tolerance 1e-6
 
 A = diag(1:50);

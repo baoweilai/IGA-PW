@@ -22,10 +22,8 @@ nurbsInfo.n_dofs = m*n;
 
 nurbsInfo.n_dofs_domains = m*n;
 
-
 nurbsInfo.pu = pu;
 nurbsInfo.pv = pv;
-
 
 uNoEs = length(UBreaks)-1;
 vNoEs=length(VBreaks)-1;
@@ -42,7 +40,6 @@ Coordinate=zeros(NoEs,4);
 
 Neighbour = zeros(uNoEs,4);
 
-
 % Build bottom-boundary DOF maps.
 
 u_ele_dofs = pu+1;
@@ -52,7 +49,6 @@ bottom_edge_dofs     = zeros(uNoEs,2*u_ele_dofs); % The two layers dofs near the
 bottom_edge_dofs_1st = zeros(uNoEs,u_ele_dofs);   % The first layer dofs lying on the bottom boundary
 
 bottom_edge_node = zeros(uNoEs,2);
-
 
 for e = 1:uNoEs
     i = findspan(Ubar,pu,UBreaks(e));
@@ -74,9 +70,7 @@ for e = 1:uNoEs
         k = k+1;
     end
 
-
 end
-
 
 % Build top-boundary DOF maps.
 
@@ -88,13 +82,11 @@ top_edge_dofs_1st = zeros(uNoEs,u_ele_dofs); %  % The first layer dofs lying on 
 
 top_edge_node = zeros(uNoEs,2);
 
-
 for e = 1:uNoEs
     i = findspan(Ubar,pu,UBreaks(e));
     top_edge_node(e,:) = [UBreaks(e),UBreaks(e+1)];
 
     k = 1;
-
 
     for j = (n-1):n
         for i1 = (i-pu):i
@@ -111,7 +103,6 @@ for e = 1:uNoEs
     end
 end
 
-
 % Build left-boundary DOF maps.
 
 v_ele_dofs = pv + 1;
@@ -119,13 +110,11 @@ left_edge_dofs     = zeros(vNoEs,2*v_ele_dofs); % [DOFs on edge, DOFs near edge]
 left_edge_dofs_1st = zeros(vNoEs,v_ele_dofs);
 left_edge_node = zeros(vNoEs,2);
 
-
 for e = 1:vNoEs
     j = findspan(Vbar,pv,VBreaks(e));
     left_edge_node(e,:) = [VBreaks(e),VBreaks(e+1)];
 
     k = 1;
-
 
     for j1 = (j-pv):j
         for i=1:2
@@ -141,9 +130,7 @@ for e = 1:vNoEs
         k = k+1;
     end
 
-
 end
-
 
 % Build right-boundary DOF maps.
 
@@ -151,7 +138,6 @@ v_ele_dofs = pv + 1;
 right_edge_dofs     = zeros(vNoEs,2*v_ele_dofs); % [DOFs on edge, DOFs near edge]
 right_edge_dofs_1st = zeros(vNoEs,v_ele_dofs);
 right_edge_node     = zeros(vNoEs,2);
-
 
 for e = 1:vNoEs
     j = findspan(Vbar,pv,VBreaks(e));
@@ -176,24 +162,20 @@ for e = 1:vNoEs
 
 end
 
-
 nurbsInfo.bottom_edge_dofs = bottom_edge_dofs;
 nurbsInfo.right_edge_dofs  = right_edge_dofs;
 nurbsInfo.top_edge_dofs    = top_edge_dofs;
 nurbsInfo.left_edge_dofs   = left_edge_dofs;
-
 
 nurbsInfo.bottom_edge_dofs_1st = bottom_edge_dofs_1st;
 nurbsInfo.top_edge_dofs_1st    = top_edge_dofs_1st;
 nurbsInfo.left_edge_dofs_1st   = left_edge_dofs_1st;
 nurbsInfo.right_edge_dofs_1st  = right_edge_dofs_1st;
 
-
 nurbsInfo.bottom_edge_node = bottom_edge_node;
 nurbsInfo.right_edge_node  = right_edge_node;
 nurbsInfo.top_edge_node    = top_edge_node;
 nurbsInfo.left_edge_node   = left_edge_node;
-
 
 for j1=1:vNoEs
     for i1=1:uNoEs
@@ -222,25 +204,21 @@ for j1=1:vNoEs
     end
 end
 
-
 invalid_ele_idx =  Neighbour<1 |  Neighbour>NoEs;
 
 Neighbour(invalid_ele_idx) = -1;
 
 nurbsInfo.Neighbour = Neighbour;
 
-
 nurbsInfo.Element=Element;
 nurbsInfo.Coordinate=Coordinate;
 nurbsInfo.knotSpanIndex=knotSpanIndex;
-
 
 bottom_row = zeros(uNoEs,pu+1);
 bottom_column=zeros(uNoEs,Eledof);
 
 top_row =bottom_row;
 top_column=bottom_column;
-
 
 bottom_node=zeros(uNoEs,2);
 bottom_span=zeros(uNoEs,1);
@@ -278,7 +256,6 @@ nurbsInfo.bottom_column=bottom_column;
 nurbsInfo.top_row=top_row;
 nurbsInfo.top_column=top_column;
 
-
 left = zeros(vNoEs,pv+1);
 right=left;
 
@@ -289,10 +266,8 @@ for e=1:vNoEs
     right(e,:)=m + (i-1)*m;
 end
 
-
 nurbsInfo.left=left;
 nurbsInfo.right=right;
-
 
 bottom_dofs_2_layers =zeros(1,2*m); % The 2 layers of DOFs  near  v=0;
 top_dofs_2_layers   = zeros(1,2*m);    % The 2 layers of DOFs  near  v=1;
@@ -317,7 +292,6 @@ for j=(n-1):n
     end
 end
 
-
 k=1;
 for j=1:n
     for i=1:2
@@ -328,7 +302,6 @@ for j=1:n
 end
 
 % left_dofs_2_layers'
-
 
 k=1;
 for j=1:n
@@ -344,7 +317,6 @@ nurbsInfo.top_dofs_2_layers = top_dofs_2_layers;
 nurbsInfo.left_dofs_2_layers = left_dofs_2_layers;
 nurbsInfo.right_dofs_2_layers  = right_dofs_2_layers;
 
-
 % The DOF index for (i,j) is:   i + (j-1)*m
 
 bottom_dofs =1:m; % this is for v=0;
@@ -358,7 +330,6 @@ nurbsInfo.n_dofs_bottom = length(bottom_dofs);
 nurbsInfo.top_dofs = top_dofs;
 nurbsInfo.n_dofs_top = length(top_dofs);
 
-
 nurbsInfo.left_dofs   = left_dofs;
 nurbsInfo.n_dofs_left = length(left_dofs);
 
@@ -369,7 +340,6 @@ bottom_dofs_2nd_layer =m + (1:m);
 top_dofs_2nd_layer   = m*(n-2) +(1:m);
 left_dofs_2nd_layer   =(0:(n-1))*m  + 2;
 right_dofs_2nd_layer =(0:(n-1))*m  + m-1;
-
 
 nurbsInfo.bottom_dofs_2nd_layer = bottom_dofs_2nd_layer;
 nurbsInfo.top_dofs_2nd_layer = top_dofs_2nd_layer;

@@ -3,7 +3,6 @@ function [knotUbar,knotVbar,knotWbar]=IGADegreeElevVolume(knotU,knotV,knotW,t)
 
 % Elevate the degree of B-spline basis functions to (pi +t) for i=1,2 and
 
-
 if t==0 % t=0 means that we do not elevate the degree of B-splines.
     knotUbar=knotU;knotVbar=knotV; knotWbar=knotW;
 end
@@ -15,6 +14,5 @@ if t>=1
     knotWbar = [zeros(1,t),knotW,ones(1,t)];
 
 end
-
 
 end

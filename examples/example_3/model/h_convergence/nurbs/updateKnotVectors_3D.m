@@ -5,7 +5,6 @@ knotU = nurbs_base.knotU;
 knotV = nurbs_base.knotV;
 knotW = nurbs_base.knotW;
 
-
 % Use the base-domain lengths to set knot spacing.
 
 a = nurbs_base.Lengths;
@@ -16,7 +15,6 @@ n = a/dx;
 
 n = fix(n);
 
-
 if n(1)>1
     n(1) = fix( n(1)/2 );
     inner_knots = linspace(0,1,n(1) + 1 );
@@ -24,7 +22,6 @@ if n(1)>1
     knotU_refine = [knotU,inner_knots];
     knotU        = sort(knotU_refine);
 end
-
 
 if n(2)>1
     n(2) = fix( n(2)/2 );
@@ -34,7 +31,6 @@ if n(2)>1
     knotV        = sort(knotV_refine);
 end
 
-
 if n(3)>1
     n(3) = fix( n(3)/2 );
     inner_knots = linspace(0,1,n(3) + 1 );
@@ -42,6 +38,5 @@ if n(3)>1
     knotW_refine = [knotW,inner_knots];
     knotW        = sort(knotW_refine);
 end
-
 
 end

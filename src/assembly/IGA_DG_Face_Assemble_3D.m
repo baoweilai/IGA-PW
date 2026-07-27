@@ -277,7 +277,6 @@ end
 
 end
 
-
 function edge_dofs_plus = get_face_dofs_x(faceName, e_v, e_w, m, n, ~, pv, pw, knotV, knotW, VBreaks, WBreaks)
 % Collect control-point DOFs on an x-normal face.
 jspan = findspan(knotV, pv, VBreaks(e_v));

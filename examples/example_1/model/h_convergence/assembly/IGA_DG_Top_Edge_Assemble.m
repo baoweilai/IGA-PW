@@ -3,7 +3,6 @@ function [P,S] =  IGA_DG_Top_Edge_Assemble(nurbs_original, nurbs_refine, pw_inde
 
 DIM = 2;
 
-
 ConPts_o   =  nurbs_original.ConPts;
 weights_o  =  nurbs_original.weights;
 knotU_o    =  nurbs_original.knotU;
@@ -11,12 +10,10 @@ knotV_o    =  nurbs_original.knotV;
 pu_o       =  nurbs_original.pu;
 pv_o       =  nurbs_original.pv;
 
-
 knotU     = nurbs_refine.Ubar;
 knotV     = nurbs_refine.Vbar;
 pu        = nurbs_refine.pu;
 pv        = nurbs_refine.pv;
-
 
 S = sparse(n_dofs,n_dofs);
 
@@ -29,18 +26,15 @@ uNoEs         = length(UBreaks) - 1;
 
 top_edge_dofs = nurbs_refine.top_edge_dofs;
 
-
 top_edge_node = zeros(uNoEs,2);
 
 for i=1:uNoEs
     top_edge_node(i,:) = [UBreaks(i),UBreaks(i+1)];
 end
 
-
 [gp,gw] = grule(10*pu+5); % The Gaussian quadrature rule on [-1,1].
 
 n_gp = length(gp);
-
 
 % Fix the boundary parameter at v = 1.
 
@@ -52,7 +46,6 @@ n_pw_basis       =  size(pw_index,1);
 basis_grad_minus =  zeros(n_pw_basis,DIM);
 basis_minus      =  zeros(n_pw_basis,1);
 Omega_area       =  L*L;
-
 
 for e=1:uNoEs
 
@@ -75,7 +68,6 @@ for e=1:uNoEs
         ds     = norm(tau);
         normal = [-tau(2);tau(1)]/ds;
 
-
         Jacobi = J1*gw(i)*ds; % The interface is u = 1, now along the v-direction
 
         Uders_plus  = bspbasisDers(knotU,pu,u,1);
@@ -88,7 +80,6 @@ for e=1:uNoEs
         DNv_u_plus = Nu_plus*DNv_plus;   DNv_u_plus = DNv_u_plus(:);
         basis_grad_plus = [DNu_v_plus,DNv_u_plus]/DF_plus;
 
-
         %% The basis functions in outer domain are plane wave functions, which do not vanish on the boundary
 
         for k = 1:n_pw_basis
@@ -98,24 +89,19 @@ for e=1:uNoEs
 
         end
 
-
         edge_jump    = [basis_plus; - basis_minus];
         edge_jump_Ae = edge_jump_Ae + edge_jump*edge_jump'*Jacobi;
-
 
         edge_average    = [basis_grad_plus; basis_grad_minus]*normal/2; % Now it is a column vector
         edge_average    = edge_average.';
         edge_average_Ae = edge_average_Ae + edge_jump*edge_average*Jacobi;
 
-
     end
-
 
     P(edge_dofs,edge_dofs) =  P(edge_dofs,edge_dofs) + edge_jump_Ae;
 
     S(edge_dofs,edge_dofs) =  S(edge_dofs,edge_dofs) + edge_average_Ae;
 
 end
-
 
 end

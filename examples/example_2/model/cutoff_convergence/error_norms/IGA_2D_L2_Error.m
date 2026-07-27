@@ -102,7 +102,6 @@ uh_filename   =  strcat( strcat(uh_filename,'/uh_'),num2str(Refinement));
 load(uh_filename, 'uh')
 current_uh = uh;
 
-
 %% Reference uh
 if strcmp(Example,'Example_1')
     ref_nurbs_filename   =  strcat('./Numerical Results/EigenFunction_Data/',Example,'/Nc_25/','p_',strcat(num2str(3)));

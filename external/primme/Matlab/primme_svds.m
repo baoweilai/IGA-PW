@@ -765,7 +765,6 @@ function [y] = precondsvds_Pstruct(P, x, mode)
    end
 end
 
-
 function [f] = fcnchk_gen(x)
    if exist('fcnchk', 'var')
       f = fcnchk(x);

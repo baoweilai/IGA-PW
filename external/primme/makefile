@@ -33,7 +33,6 @@ ifneq ($(SONAMELIBRARYMAJOR),$(SONAMELIBRARY))
 	@cd lib; ln -fs $(SONAMELIBRARY) $(SONAMELIBRARYMAJOR)
 endif
 
-
 clean: 
 	@$(MAKE) -C src clean
 

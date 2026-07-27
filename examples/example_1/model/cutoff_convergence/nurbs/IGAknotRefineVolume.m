@@ -1,13 +1,11 @@
 function [Ubar,Vbar,Wbar,dof]=IGAknotRefineVolume(knotU,pu,knotV,pv,knotW,pw,Refinement)
 % Refine NURBS volume knot vectors.
 
-
 Ubar = knotU;
 
 Vbar = knotV;
 
 Wbar = knotW;
-
 
 for i=1:Refinement
     UBreks=unique(Ubar);VBreks=unique(Vbar); WBreks=unique(Wbar);

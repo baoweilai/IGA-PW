@@ -172,7 +172,6 @@ static bool isGPU(CPU) { return false; }
 static bool isCPU(GPU) { return false; }
 static bool isGPU(GPU) { return true; }
 
-
 // Auxiliary function for copy_mxArray, copy the content of a mxArray with
 // compatible C type TX to a C array of type TY.
 // Arguments:
@@ -472,7 +471,6 @@ static int tprimme(std::complex<double> *evals, std::complex<double> *evecs, dou
 }
 #endif /* GPU_ARRAY */
 
-
 // Template version of sprimme_svds, cprimme_svds, dprimme_svds and zprimme_svds
 
 static int tprimme_svds(float *svals, float *svecs, float *resNorms, primme_svds_params *primme_svds, CPU) { 
@@ -502,7 +500,6 @@ static int tprimme_svds(double *svals, std::complex<double> *svecs, double *resN
 }
 #endif /* GPU_ARRAY */
 
-
 // Select the function based on primme_op_datatype
 
 template <typename T, typename F, typename G,
@@ -525,7 +522,6 @@ typename S<T, F, G>::t select_fun(primme_op_datatype t) {
       }
    }
 }
-
 
 // Check that there are N input arguments in a MATLAB function
 
@@ -841,7 +837,6 @@ static void mexFunction_primme_set_member(int nlhs, mxArray *plhs[], int nrhs,
          primme->commInfo = (void*)a;
          break;
       }
-
 
       // Forbidden members
  
@@ -1191,7 +1186,6 @@ static void monitorFunEigs(void *basisEvals, int *basisSize, int *basisFlags,
    for (int i=1; i<14; i++) mxDestroyArray(prhs[i]); 
 }
 
-
 // Wrapper around xprimme; prototype:
 // [ret, evals, rnorms, evecs] = mexFunction_xprimme(init_guesses, primme)
 
@@ -1308,7 +1302,6 @@ static void mexFunction_xprimme(int nlhs, mxArray *plhs[], int nrhs,
    if (primme->convtest) {
       primme->convTestFun = convTestFunEigs<T, CPUGPU, EVAL>;
    }
-
 
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__)) || defined (__FreeBSD__)
    // Set ctrl+c handler
@@ -1478,7 +1471,6 @@ static void mexFunction_primme_svds_set_member(int nlhs, mxArray *plhs[],
          break;
       }
 
-
       case PRIMME_SVDS_targetShifts:
       {
          ASSERT_NUMERIC(2);
@@ -1539,7 +1531,6 @@ static void mexFunction_primme_svds_set_member(int nlhs, mxArray *plhs[],
          primme_svds->commInfo = (void*)a;
          break;
       }
-
 
       // Forbidden members
  
@@ -1791,7 +1782,6 @@ struct getSvdsForPreconditioner {
    }
 };
 
-
 // Auxiliary function for mexFunction_xprimme_svds; PRIMME wrapper around
 // matrixMatvec and applyPreconditioner. Create a mxArray
 // from input vector x, call the function handler returned by F and
@@ -1953,7 +1943,6 @@ static void monitorFunSvds(void *basisSvals, int *basisSize, int *basisFlags,
    for (int i=1; i<15; i++) mxDestroyArray(prhs[i]); 
 }
 
-
 // Wrapper around xprimme_svds; prototype:
 // [ret, evals, rnorms, evecs] = mexFunction_xprimme_svds(...
 //                            init_guesses_left, init_guesses_right, primme_svds)
@@ -1989,7 +1978,6 @@ static void mexFunction_xprimme_svds(int nlhs, mxArray *plhs[], int nrhs,
       magma_queue_create(gpuDevice, (magma_queue_t*)primme_svds->queue);
    }
 #endif
-
 
    // Allocate svals, rnorms and svecs; if possible create the mxArray and use
    // its data

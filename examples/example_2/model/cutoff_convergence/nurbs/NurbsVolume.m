@@ -1,12 +1,10 @@
 function [S,DF,W,DW]=NurbsVolume(ConPts,weights,knotU,pu,u,knotV,pv,v,knotW,pw,w)
 % Evaluate a NURBS volume.
 
-
 ndim=size(ConPts,4);
 
 Pw=WightedConPtsVolume(ConPts,weights);
 Sw=PointOnBspVolume(Pw,knotU,pu,u,knotV,pv,v,knotW,pw,w);
-
 
 S=Project(Sw);
 W=Sw(end);

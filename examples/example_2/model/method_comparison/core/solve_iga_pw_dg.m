@@ -254,7 +254,6 @@ end
 
 end
 
-
 function nurbs_original = make_rect_patch(rect)
 % Build an affine rectangular NURBS patch.
 x1 = rect(1); x2 = rect(2);

@@ -1,7 +1,6 @@
 function H = compute_Nonlinear_Mass_Mat_PW(L, Nc, inner_domains,rho, u0_h)
 % Assemble the plane-wave nonlinear mass matrix.
 
-
 % Build the circular plane-wave index set.
 DIM = 2;
 n = 0; % number of basis satisfying |k|<=Nc
@@ -21,16 +20,13 @@ end
 
 p = p(1:n,:);
 
-
 % Sample the nonlinear potential on a Cartesian grid.
-
 
 dx = 1e-1;
 m  = L/dx;
 m  = floor(m);
 dy = dx;
 vext = zeros(m,m);
-
 
 for ii = 1:m
     for j = 1:m
@@ -42,11 +38,9 @@ for ii = 1:m
     end
 end
 
-
 % Transform the sampled potential to Fourier coefficients.
 
 vext_fft = ifftn(vext);
-
 
 % Assemble the Fourier convolution matrix.
 
@@ -56,7 +50,6 @@ for ii=1:n
     for j=1:n
         dk  =  p(j,:) - p(ii,:);
         q_p = dk;
-
 
         % Map the wave-vector difference to an FFT index.
 
@@ -78,7 +71,6 @@ for ii=1:n
 end
 
 end
-
 
 function Vr = V_hydrogen(x,y,inner_domains,rho,u0h,L,pw_index, n_pw_basis )
 % Evaluate the hydrogen potential.
@@ -102,7 +94,6 @@ for i = 1:n_inner_domains
     end
 
 end
-
 
 if Omega_in_flag == true
     Vr = 0;

@@ -17,11 +17,9 @@ ConPtsWbar=zeros(pu+1,pv+1,pw,ndim);
 
 tempU= U(uspan+1:uspan+pu)-U(uspan-pu+1:uspan);
 
-
 tempV=V(vspan+1:vspan+pv)-V(vspan-pv+1:vspan);
 
 tempW=W(wspan+1:wspan+pw)-W(wspan-pw+1:wspan);
-
 
 for  dim=1:ndim
 
@@ -49,9 +47,7 @@ for  dim=1:ndim
         end
     end
 
-
 end
-
 
 % Evaluate the derivative volume in the u direction.
 Ubar=U;
@@ -73,7 +69,6 @@ for dim=1:ndim
 
 end
 
-
 % Evaluate the derivative volume in the v direction.
 Vbar=V;
 Vbar([1,end])=[];
@@ -93,7 +88,6 @@ for dim=1:ndim
     end
 
 end
-
 
 % Evaluate the derivative volume in the w direction.
 Wbar=W;
@@ -115,6 +109,5 @@ for dim=1:ndim
     end
 
 end
-
 
 end

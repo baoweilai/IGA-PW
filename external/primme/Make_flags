@@ -21,7 +21,6 @@ endif
 LIBRARY = libprimme.a
 SOLIBRARY = libprimme.$(SLIB)
 
-
 # Define compilers and flags
 #---------------------------------------------------------------
 # POSIX systems (e.g., Linux, MinGW, Cygwin)
@@ -40,7 +39,6 @@ PRIMME_WITH_FLOAT ?= yes
 ifneq ($(PRIMME_WITH_FLOAT), yes)
     CFLAGS += -DPRIMME_WITHOUT_FLOAT
 endif
-
 
 # GPUs compiler flags
 #---------------------------------------------------------------
@@ -82,7 +80,6 @@ endif
 #CFLAGS   = -O2
 #FFLAGS   = -O2
 #---------------------------------------------------------------
-
 
 #---------------------------------------------------------------
 # Uncomment this when building MATLAB interface (but not for Octave)

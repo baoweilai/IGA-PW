@@ -228,7 +228,6 @@ end
 
 end
 
-
 function [k_list, n_basis] = build_pw_disk(Nc)
 % Build the plane-wave disk basis.
 N = floor(Nc);

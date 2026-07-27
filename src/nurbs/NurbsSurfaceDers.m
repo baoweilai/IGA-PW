@@ -23,9 +23,7 @@ P_v=ConPts(u_index,v_index,2);
 
 DIM=2;
 
-
 F=zeros(DIM,1);
-
 
 % Compute the rational weight, surface point, and weight derivatives.
 W = Nu * w_ij * Nv;
@@ -44,7 +42,6 @@ D2W(2,1) = D2W(1,2);   D2W(2,2) = Nu  * w_ij *D2Nv;
 W2 = W*W;
 W4 = W2*W2;
 
-
 % Form the surface Jacobian from rational basis derivatives.
 R_DNu = (DNu*W-Nu*DW(1))/W2;
 R_DNv = (DNv*W-Nv*DW(2))/W2;
@@ -58,7 +55,6 @@ DF(2,1) = R_DNu *(P_v.*w_ij)*Nv;
 DF(2,2) = Nu *(P_v.*w_ij)*R_DNv;
 
 D2F=zeros(DIM,DIM,DIM);
-
 
 % Form the surface Hessian and mixed derivatives.
 R_D2Nu =  ( (D2Nu*W-Nu*D2W(1,1))*W2-(DNu*W-Nu*DW(1))*2*W*DW(1) )/W4;
@@ -74,6 +70,5 @@ D2F(1,1,2) = D2F(1,2,1);
 D2F(1,2,2) = Nu *(w_ij.*P_u)*R_D2Nv;
 D2F(2,1,2) = D2F(2,2,1);
 D2F(2,2,2) = Nu *(w_ij.*P_v)*R_D2Nv;
-
 
 end
